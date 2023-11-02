@@ -29,12 +29,21 @@ func NewOpenAIEmbeddingModel(embeddingModelID EmbeddingModelID, apiKey string) E
 	return &OpenAIEmbeddingModel{modelID: embeddingModelID, apiKey: apiKey}
 }
 
-func (m *OpenAIModel) MessageStream(ctx context.Context, messages []Message, options MessageOptions) (chan StreamEvent, error) {
+func (m *OpenAIModel) MessageStream(ctx context.Context, messages []*Message, options *MessageOptions) (chan StreamEvent, error) {
 	// TODO: implement
 	panic("not implemented")
 }
 
-func (m *OpenAIModel) Message(ctx context.Context, messages []Message, options MessageOptions) (*Message, error) {
+func (m *OpenAIModel) Message(ctx context.Context, messages []*Message, options *MessageOptions) (*Message, error) {
+	args := m.buildArgs(messages, options)
+	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
+		return nil, err
+	} else {
+		return parseResponse(response)
+	}
+}
+
+func (m *OpenAIModel) buildArgs(messages []*Message, options *MessageOptions) map[string]any {
 	jsonMessages := []map[string]string{}
 	for _, message := range messages {
 		jsonMessage := map[string]string{
@@ -67,9 +76,36 @@ func (m *OpenAIModel) Message(ctx context.Context, messages []Message, options M
 			args["function_call"] = fmt.Sprintf("{\"name\":\\ \"%s\"}", options.FunctionCall)
 		}
 	}
+	return args
+}
+
+func (m *OpenAIModel) Action(ctx context.Context, messages []*Message, options *MessageOptions) (*Action, error) {
+	args := m.buildArgs(messages, options)
 	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
 		return nil, err
-	} else if choices, ok := response["choices"].([]any); !ok {
+	} else if message, err := parseResponse(response); err != nil {
+		return nil, err
+	} else if message.FunctionCall == nil {
+		return nil, &Error{Message: "invalid response, no function call"}
+	} else {
+		return &Action{
+			Name:      message.FunctionCall.Name,
+			Arguments: message.FunctionCall.Arguments,
+		}, nil
+	}
+}
+
+type Error struct {
+	Code    string
+	Message string
+}
+
+func (e *Error) Error() string {
+	return e.Message
+}
+
+func parseResponse(response map[string]any) (*Message, error) {
+	if choices, ok := response["choices"].([]any); !ok {
 		return nil, &Error{Message: "invalid response, no choices"}
 	} else if len(choices) != 1 {
 		return nil, &Error{Message: "invalid response, expected 1 choice"}
@@ -99,15 +135,6 @@ func (m *OpenAIModel) Message(ctx context.Context, messages []Message, options M
 		}
 	}
 	return nil, &Error{Message: "invalid response, no content or function call"}
-}
-
-type Error struct {
-	Code    string
-	Message string
-}
-
-func (e *Error) Error() string {
-	return e.Message
 }
 
 func apiRequest(ctx context.Context, apiKey string, endpoint string, args map[string]any) (map[string]any, error) {
