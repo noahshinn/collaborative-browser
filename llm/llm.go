@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"fmt"
 )
 
 type ChatModelID string
@@ -27,22 +26,6 @@ var AllModels = Models{
 	EmbeddingModels: map[EmbeddingModelID]EmbeddingModel{
 		EmbeddingModelAda: NewOpenAIEmbeddingModel(EmbeddingModelAda, "api-key"),
 	},
-}
-
-func (m *Models) ChatModel(id string) (ChatModel, error) {
-	if model, ok := m.ChatModels[ChatModelID(id)]; !ok {
-		return nil, fmt.Errorf("chat model %s not found", id)
-	} else {
-		return model, nil
-	}
-}
-
-func (m *Models) EmbeddingModel(id string) (EmbeddingModel, error) {
-	if model, ok := m.EmbeddingModels[EmbeddingModelID(id)]; !ok {
-		return nil, fmt.Errorf("embedding model %s not found", id)
-	} else {
-		return model, nil
-	}
 }
 
 type FunctionDef struct {
@@ -113,5 +96,5 @@ type ChatModel interface {
 }
 
 type EmbeddingModel interface {
-	Embedding(ctx context.Context, text []string) ([]float32, error)
+	Embedding(ctx context.Context, texts []string) ([][]float32, error)
 }

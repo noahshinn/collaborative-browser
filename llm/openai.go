@@ -39,7 +39,7 @@ func (m *OpenAIModel) Message(ctx context.Context, messages []*Message, options 
 	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
 		return nil, err
 	} else {
-		return parseResponse(response)
+		return parseMessageResponse(response)
 	}
 }
 
@@ -83,7 +83,7 @@ func (m *OpenAIModel) Action(ctx context.Context, messages []*Message, options *
 	args := m.buildArgs(messages, options)
 	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
 		return nil, err
-	} else if message, err := parseResponse(response); err != nil {
+	} else if message, err := parseMessageResponse(response); err != nil {
 		return nil, err
 	} else if message.FunctionCall == nil {
 		return nil, &Error{Message: "invalid response, no function call"}
@@ -104,7 +104,7 @@ func (e *Error) Error() string {
 	return e.Message
 }
 
-func parseResponse(response map[string]any) (*Message, error) {
+func parseMessageResponse(response map[string]any) (*Message, error) {
 	if choices, ok := response["choices"].([]any); !ok {
 		return nil, &Error{Message: "invalid response, no choices"}
 	} else if len(choices) != 1 {
@@ -135,6 +135,34 @@ func parseResponse(response map[string]any) (*Message, error) {
 		}
 	}
 	return nil, &Error{Message: "invalid response, no content or function call"}
+}
+
+func parseEmbeddingsResponse(texts []string, response map[string]any) ([][]float32, error) {
+	embeddings := make([][]float32, len(texts))
+	if data, ok := response["data"].([]any); !ok {
+		return nil, &Error{Message: "invalid embeddings response; missing choices"}
+	} else if len(data) != len(texts) {
+		return nil, &Error{Message: "invalid embeddings response; number of embeddings does not match input"}
+	} else {
+		for i, body := range data {
+			if object, ok := body.(map[string]any); !ok {
+				return nil, &Error{Message: "invalid embedding; embedding is not a JSON object"}
+			} else if values, ok := object["embedding"].([]any); !ok {
+				return nil, &Error{Message: "invalid embedding; missing embedding array"}
+			} else {
+				embedding := make([]float32, len(values))
+				for j, value := range values {
+					if number, ok := value.(float64); !ok {
+						return nil, &Error{Message: "invalid embedding; number is not a float"}
+					} else {
+						embedding[j] = float32(number)
+					}
+				}
+				embeddings[i] = embedding
+			}
+		}
+		return embeddings, nil
+	}
 }
 
 func apiRequest(ctx context.Context, apiKey string, endpoint string, args map[string]any) (map[string]any, error) {
@@ -171,7 +199,16 @@ func apiRequest(ctx context.Context, apiKey string, endpoint string, args map[st
 	}
 }
 
-func (m *OpenAIEmbeddingModel) Embedding(ctx context.Context, text []string) ([]float32, error) {
-	// TODO: implement
-	return nil, nil
+func (m *OpenAIEmbeddingModel) Embedding(ctx context.Context, texts []string) ([][]float32, error) {
+	args := map[string]any{
+		"model": m.modelID,
+		"input": texts,
+	}
+	if response, err := apiRequest(ctx, m.apiKey, "embeddings", args); err != nil {
+		return nil, err
+	} else if embeddings, err := parseEmbeddingsResponse(texts, response); err != nil {
+		return nil, err
+	} else {
+		return embeddings, nil
+	}
 }
