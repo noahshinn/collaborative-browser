@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"webbot/browser"
+	"webbot/browser/virtualid"
 	"webbot/llm"
 	"webbot/utils/slicesx"
 )
@@ -15,8 +15,8 @@ type Actor interface {
 }
 
 type BrowserAction struct {
-	Type BrowserActionType `json:"type"`
-	ID   browser.VirtualID `json:"id"`
+	Type BrowserActionType   `json:"type"`
+	ID   virtualid.VirtualID `json:"id"`
 
 	// for send_keys
 	Text string `json:"text"`
@@ -107,7 +107,7 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*BrowserAction
 			} else {
 				return &BrowserAction{
 					Type: BrowserActionTypeClick,
-					ID:   browser.VirtualID(id),
+					ID:   virtualid.VirtualID(id),
 				}, nil
 			}
 		case "send_keys":
@@ -118,7 +118,7 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*BrowserAction
 			} else {
 				return &BrowserAction{
 					Type: BrowserActionTypeSendKeys,
-					ID:   browser.VirtualID(id),
+					ID:   virtualid.VirtualID(id),
 					Text: text,
 				}, nil
 			}

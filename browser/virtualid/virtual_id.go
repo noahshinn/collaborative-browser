@@ -1,4 +1,4 @@
-package browser
+package virtualid
 
 import (
 	"fmt"
