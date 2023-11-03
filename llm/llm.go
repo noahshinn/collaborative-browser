@@ -14,18 +14,24 @@ const (
 )
 
 type Models struct {
-	ChatModels      map[ChatModelID]ChatModel
-	EmbeddingModels map[EmbeddingModelID]EmbeddingModel
+	DefaultChatModel      ChatModel
+	DefaultEmbeddingModel EmbeddingModel
+	ChatModels            map[ChatModelID]ChatModel
+	EmbeddingModels       map[EmbeddingModelID]EmbeddingModel
 }
 
-var AllModels = Models{
-	ChatModels: map[ChatModelID]ChatModel{
-		ChatModelGPT35Turbo: NewOpenAIChatModel(ChatModelGPT35Turbo, "api-key"),
-		ChatModelGPT4:       NewOpenAIChatModel(ChatModelGPT4, "api-key"),
-	},
-	EmbeddingModels: map[EmbeddingModelID]EmbeddingModel{
-		EmbeddingModelAda: NewOpenAIEmbeddingModel(EmbeddingModelAda, "api-key"),
-	},
+func AllModels(api_key string) Models {
+	return Models{
+		DefaultChatModel:      NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
+		DefaultEmbeddingModel: NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
+		ChatModels: map[ChatModelID]ChatModel{
+			ChatModelGPT35Turbo: NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
+			ChatModelGPT4:       NewOpenAIChatModel(ChatModelGPT4, api_key),
+		},
+		EmbeddingModels: map[EmbeddingModelID]EmbeddingModel{
+			EmbeddingModelAda: NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
+		},
+	}
 }
 
 type FunctionDef struct {

@@ -7,39 +7,25 @@ import (
 	"fmt"
 	"webbot/browser/virtualid"
 	"webbot/llm"
+	"webbot/runner/trajectory"
 	"webbot/utils/slicesx"
 )
 
 type Actor interface {
-	NextAction() (*BrowserAction, error)
+	NextAction(ctx context.Context, state string) (*trajectory.BrowserAction, error)
 }
-
-type BrowserAction struct {
-	Type BrowserActionType   `json:"type"`
-	ID   virtualid.VirtualID `json:"id"`
-
-	// for send_keys
-	Text string `json:"text"`
-}
-
-type BrowserActionType string
-
-const (
-	BrowserActionTypeClick    BrowserActionType = "click"
-	BrowserActionTypeSendKeys BrowserActionType = "send_keys"
-)
 
 type LLMActor struct {
 	ChatModel llm.ChatModel
 }
 
-func NewLLMActor(chatModel llm.ChatModel) *LLMActor {
+func NewLLMActor(chatModel llm.ChatModel) Actor {
 	return &LLMActor{ChatModel: chatModel}
 }
 
 const systemPromptToActOnBrowser = "Take an action on the browser."
 
-func (a *LLMActor) NextAction(ctx context.Context, state string) (*BrowserAction, error) {
+func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.BrowserAction, error) {
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,
@@ -105,8 +91,8 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*BrowserAction
 			if id, ok := args["id"].(string); !ok {
 				return nil, errors.New("\"click\" action was taken but no id was supplied")
 			} else {
-				return &BrowserAction{
-					Type: BrowserActionTypeClick,
+				return &trajectory.BrowserAction{
+					Type: trajectory.BrowserActionTypeClick,
 					ID:   virtualid.VirtualID(id),
 				}, nil
 			}
@@ -116,8 +102,8 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*BrowserAction
 			} else if text, ok := args["text"].(string); !ok || text == "" {
 				return nil, errors.New("\"send_keys\" action was taken but no text was supplied")
 			} else {
-				return &BrowserAction{
-					Type: BrowserActionTypeSendKeys,
+				return &trajectory.BrowserAction{
+					Type: trajectory.BrowserActionTypeSendKeys,
 					ID:   virtualid.VirtualID(id),
 					Text: text,
 				}, nil

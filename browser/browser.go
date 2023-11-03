@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"webbot/actor"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
 	"webbot/compilers/html2md"
+	"webbot/runner/trajectory"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
@@ -18,15 +18,17 @@ type Browser struct {
 	mu                 *sync.Mutex
 	ctx                context.Context
 	cancel             context.CancelFunc
-	options            *BrowserOptions
+	options            []BrowserOption
 	currentDisplay     *BrowserDisplay
 	vIDGenerator       virtualid.VirtualIDGenerator
 	htmlToMDTranslater *html2md.HTML2MDTranslater
 }
 
-type BrowserOptions struct {
-	RunHeadless bool
-}
+type BrowserOption string
+
+const (
+	BrowserOptionHeadless BrowserOption = "headless"
+)
 
 type BrowserDisplay struct {
 	text string
@@ -36,12 +38,14 @@ func (bd *BrowserDisplay) Text() string {
 	return bd.text
 }
 
-func (b *Browser) AcceptAction(action *actor.BrowserAction) error {
+func (b *Browser) AcceptAction(action *trajectory.BrowserAction) error {
 	switch action.Type {
-	case actor.BrowserActionTypeClick:
+	case trajectory.BrowserActionTypeClick:
 		return b.Click(action.ID)
-	case actor.BrowserActionTypeSendKeys:
+	case trajectory.BrowserActionTypeSendKeys:
 		return b.SendKeys(action.ID, action.Text)
+	case trajectory.BrowserActionTypeNavigate:
+		return b.GoTo(action.URL)
 	default:
 		return fmt.Errorf("unsupported browser action type: %s", action.Type)
 	}
@@ -96,11 +100,15 @@ func (b *Browser) Render(lang language.Language) (string, error) {
 	}
 }
 
-func NewBrowser(ctx context.Context, options *BrowserOptions) *Browser {
+func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 	vIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	ops := chromedp.DefaultExecAllocatorOptions[:]
-	if options.RunHeadless {
-		ops = append(ops, chromedp.Flag("headless", true))
+	for _, option := range options {
+		switch option {
+		case BrowserOptionHeadless:
+			ops = append(ops, chromedp.Flag("headless", true))
+		default:
+		}
 	}
 	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)
 	browserCtx, cancel := chromedp.NewContext(parentCtx)
