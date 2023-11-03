@@ -5,21 +5,18 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"webbot/browser/virtualid"
 
 	"golang.org/x/net/html"
 )
 
 type HTML2MDTranslater struct {
-	Buttons    map[string]struct{}
-	TextInputs map[string]struct{}
+	virtualIDGenerator virtualid.VirtualIDGenerator
 }
-
-// TODO: implement ID generator
-var idCounter int = 0
 
 const maxListDisplaySize = 5
 
-func (t *HTML2MDTranslater) Translate(text string) (string, error) {
+func (t *HTML2MDTranslater) Translate(text string, virtualIDGenerator virtualid.VirtualIDGenerator) (string, error) {
 	doc, err := html.Parse(strings.NewReader(text))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing HTML: %v\n", err)
@@ -40,15 +37,9 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 		content := t.visitChildren(n)
 		switch n.Data {
 		case "button":
-			// REMOVE
-			// print all attributes
-			for _, attr := range n.Attr {
-				fmt.Printf("button attr: %v\n", attr)
-			}
 			text := strings.Join(content, "")
-			id := idCounter
-			idCounter++
-			return fmt.Sprintf("[%s](ID_%d)", text, id)
+			id := t.virtualIDGenerator.Generate()
+			return fmt.Sprintf("[%s](%s)", text, id)
 		case "input":
 			typ := ""
 			name := ""
@@ -64,18 +55,17 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 				default:
 				}
 			}
-			id := idCounter
-			idCounter++
+			id := t.virtualIDGenerator.Generate()
 			if typ == "hidden" {
 				return ""
 			} else if typ == "submit" {
-				return fmt.Sprintf("[%s](ID_%d)", name, id)
+				return fmt.Sprintf("[%s](%s)", name, id)
 			} else {
 				text := name
 				if text == "" {
 					text = ariaLabel
 				}
-				return fmt.Sprintf("[%s, type=%s](ID_%d)", text, typ, id)
+				return fmt.Sprintf("[%s, type=%s](%s)", text, typ, id)
 			}
 		case "b", "strong":
 			return "**" + strings.Join(content, "") + "**"
@@ -127,9 +117,8 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 		case "ul", "ol":
 			if len(content) > maxListDisplaySize {
 				// TODO: improve the button display
-				id := idCounter
-				idCounter++
-				return strings.Join(content[:maxListDisplaySize], "\n") + fmt.Sprintf("\n\n[See more](ID_%d)", id)
+				id := t.virtualIDGenerator.Generate()
+				return strings.Join(content[:maxListDisplaySize], "\n") + fmt.Sprintf("\n\n[See more](%s)", id)
 			}
 			return strings.Join(content, "\n")
 		case "div", "section", "body", "header", "form":

@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"sync"
 	"webbot/actor"
+	"webbot/browser/language"
 	"webbot/browser/virtualid"
 	"webbot/compilers/html2md"
 
+	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
 )
 
@@ -48,10 +50,7 @@ func (b *Browser) AcceptAction(action *actor.BrowserAction) error {
 func (b *Browser) run(actions ...chromedp.Action) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if err := chromedp.Run(b.ctx, actions...); err != nil {
-		return fmt.Errorf("error running actions: %w", err)
-	}
-	return b.UpdateDisplay()
+	return chromedp.Run(b.ctx, actions...)
 }
 
 // TODO: implement a general wait method that is robust for almost all page loads
@@ -78,29 +77,23 @@ func (b *Browser) GoTo(u string) error {
 	return b.run(chromedp.Navigate(u))
 }
 
-type Language string
-
-const (
-	LanguageHTML Language = "html"
-	LanguageMD   Language = "md"
-)
-
-func (b *Browser) Render(language Language) (string, error) {
-	switch language {
-	case LanguageHTML:
-		// TODO: implement
-		return "", nil
-	case LanguageMD:
-		// TODO: implement
-		return "", nil
-	default:
-		return "", fmt.Errorf("unsupported language: %s", language)
+func (b *Browser) Render(lang language.Language) (string, error) {
+	node, err := dom.GetDocument().Do(b.ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting document: %w", err)
 	}
-}
-
-func (b *Browser) UpdateDisplay() error {
-	// TODO: implement
-	return nil
+	html, err := dom.GetOuterHTML().WithNodeID(node.NodeID).Do(b.ctx)
+	if err != nil {
+		return "", fmt.Errorf("error getting outer html: %w", err)
+	}
+	switch lang {
+	case language.LanguageHTML:
+		return html, nil
+	case language.LanguageMD:
+		return b.htmlToMDTranslater.Translate(html, b.vIDGenerator)
+	default:
+		return "", fmt.Errorf("unsupported language: %s", lang)
+	}
 }
 
 func NewBrowser(ctx context.Context, options *BrowserOptions) *Browser {

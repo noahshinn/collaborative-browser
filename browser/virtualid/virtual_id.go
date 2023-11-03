@@ -12,7 +12,7 @@ const VirtualIDPrefix = "vid-"
 const VirtualIDDataAttr = "data-vid"
 
 type VirtualIDGenerator interface {
-	Next() VirtualID
+	Generate() VirtualID
 	IsValidVirtualID(id VirtualID) bool
 }
 
@@ -25,7 +25,7 @@ func NewIncrIntVirtualIDGenerator() VirtualIDGenerator {
 	return &IncrIntVirtualIDGenerator{Cur: 0}
 }
 
-func (g *IncrIntVirtualIDGenerator) Next() VirtualID {
+func (g *IncrIntVirtualIDGenerator) Generate() VirtualID {
 	newID := VirtualID(fmt.Sprintf("%s%d", VirtualIDPrefix, g.Cur))
 	g.Cur++
 	return newID
