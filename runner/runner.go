@@ -15,10 +15,11 @@ type Runner interface {
 }
 
 type FiniteRunner struct {
+	ctx         context.Context
 	Actor       act.Actor
 	Browser     *browser.Browser
 	MaxNumSteps int
-	Trajectory  []trajectory.TrajectoryItem
+	Trajectory  *trajectory.Trajectory
 }
 
 const DefaultMaxNumSteps = 5
@@ -43,7 +44,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 		actor := act.NewLLMActor(allModels.DefaultChatModel)
 		browser := browser.NewBrowser(ctx, options.BrowserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
-		if err := browser.AcceptAction(initialAction); err != nil {
+		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
 			return nil, fmt.Errorf("browser failed to accept initial action: %w", err)
 		}
 		pageRender, err := browser.Render(language.LanguageMD)
@@ -51,8 +52,14 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 			return nil, fmt.Errorf("page visit was successful but browser failed to render initial page: %w", err)
 		}
 		initialObservation := trajectory.NewBrowserObservation(pageRender)
-		trajectory := []trajectory.TrajectoryItem{initialAction, initialObservation}
+		trajectory := &trajectory.Trajectory{
+			Items: []trajectory.TrajectoryItem{
+				initialAction,
+				initialObservation,
+			},
+		}
 		return &FiniteRunner{
+			ctx:         ctx,
 			Actor:       actor,
 			Browser:     browser,
 			MaxNumSteps: maxNumSteps,
@@ -61,9 +68,26 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 	}
 }
 
-func NewFiniteRunnerFromInitialPageAndRequest(url string, request string, maxNumSteps int, options *RunnerOptions) *FiniteRunner {
-	// TODO: implement
-	return nil
+func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, request string, options *RunnerOptions) (*FiniteRunner, error) {
+	runner, err := NewFiniteRunnerFromInitialPage(ctx, url, options)
+	if err != nil {
+		return nil, err
+	}
+	message := trajectory.NewUserMessage(request)
+	runner.Trajectory.AddItem(message)
+	nextAction, err := runner.Actor.NextAction(ctx, runner.Trajectory.GetText())
+	if err != nil {
+		return nil, fmt.Errorf("page visit was successful but the actor failed to perform the initial action: %w", err)
+	}
+	runner.Trajectory.AddItem(nextAction)
+	if err := runner.Browser.AcceptAction(nextAction); err != nil {
+		return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
+	} else if pageRender, err := runner.Browser.Render(language.LanguageMD); err != nil {
+		return nil, fmt.Errorf("page visit was successful but the browser failed to render the initial page: %w", err)
+	} else {
+		runner.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender))
+		return runner, nil
+	}
 }
 
 func (r *FiniteRunner) Run() error {
@@ -76,6 +100,17 @@ func (r *FiniteRunner) Run() error {
 }
 
 func (r *FiniteRunner) runStep() error {
-	// TODO: implement
+	state := r.Trajectory.GetText()
+	nextAction, err := r.Actor.NextAction(r.ctx, state)
+	if err != nil {
+		return fmt.Errorf("actor failed to perform action: %w", err)
+	}
+	r.Trajectory.AddItem(nextAction)
+	// TODO: store the previous page render so that it doesn't have to be rerendered
+	pageRender, err := r.Browser.Render(language.LanguageMD)
+	if err != nil {
+		return fmt.Errorf("browser failed to render page: %w", err)
+	}
+	r.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender))
 	return nil
 }
