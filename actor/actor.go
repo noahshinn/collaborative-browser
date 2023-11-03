@@ -12,7 +12,7 @@ import (
 )
 
 type Actor interface {
-	NextAction(ctx context.Context, state string) (*trajectory.BrowserAction, error)
+	NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error)
 }
 
 type LLMActor struct {
@@ -25,7 +25,7 @@ func NewLLMActor(chatModel llm.ChatModel) Actor {
 
 const systemPromptToActOnBrowser = "Take an action on the browser."
 
-func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.BrowserAction, error) {
+func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error) {
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,
@@ -67,11 +67,47 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.Br
 				Required: []string{"id", "text"},
 			},
 		},
+		{
+			Name: "navigate",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"url": {
+						Type:        "string",
+						Description: "The url to navigate the browser to",
+					},
+				},
+				Required: []string{"url"},
+			},
+		},
+		{
+			Name: "message",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"text": {
+						Type:        "string",
+						Description: "The text for a message to send to the user",
+					},
+				},
+				Required: []string{"text"},
+			},
+		},
+		{
+			Name: "task_complete",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"reason": {
+						Type:        "string",
+						Description: "The reason that the task is complete or cannot be completed",
+					},
+				},
+				Required: []string{"reason"},
+			},
+		},
 	}
-	permissibleActions := []string{
-		"click",
-		"send_keys",
-	}
+	permissibleActionNames := slicesx.Map(functions, func(function llm.FunctionDef) string { return function.Name })
 	if res, err := a.ChatModel.Message(ctx, messages, &llm.MessageOptions{
 		Temperature: 0.0,
 		Functions:   functions,
@@ -79,7 +115,7 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.Br
 		return nil, err
 	} else if res.FunctionCall == nil {
 		return nil, errors.New("no function call")
-	} else if res.FunctionCall.Name == "" || !slicesx.Contains(permissibleActions, res.FunctionCall.Name) {
+	} else if res.FunctionCall.Name == "" || !slicesx.Contains(permissibleActionNames, res.FunctionCall.Name) {
 		return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
 	} else {
 		var args map[string]any
@@ -91,10 +127,7 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.Br
 			if id, ok := args["id"].(string); !ok {
 				return nil, errors.New("\"click\" action was taken but no id was supplied")
 			} else {
-				return &trajectory.BrowserAction{
-					Type: trajectory.BrowserActionTypeClick,
-					ID:   virtualid.VirtualID(id),
-				}, nil
+				return trajectory.NewBrowserClickAction(virtualid.VirtualID(id)), nil
 			}
 		case "send_keys":
 			if id, ok := args["id"].(string); !ok {
@@ -102,11 +135,19 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (*trajectory.Br
 			} else if text, ok := args["text"].(string); !ok || text == "" {
 				return nil, errors.New("\"send_keys\" action was taken but no text was supplied")
 			} else {
-				return &trajectory.BrowserAction{
-					Type: trajectory.BrowserActionTypeSendKeys,
-					ID:   virtualid.VirtualID(id),
-					Text: text,
-				}, nil
+				return trajectory.NewBrowserSendKeysAction(virtualid.VirtualID(id), text), nil
+			}
+		case "navigate":
+			if url, ok := args["url"].(string); !ok {
+				return nil, errors.New("\"navigate\" action was taken but no url was supplied")
+			} else {
+				return trajectory.NewBrowserNavigateAction(url), nil
+			}
+		case "message":
+			if text, ok := args["text"].(string); !ok || text == "" {
+				return nil, errors.New("\"message\" action was taken but no text was supplied")
+			} else {
+				return trajectory.NewAgentMessage(text), nil
 			}
 		default:
 			return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)

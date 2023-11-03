@@ -29,6 +29,7 @@ func (t *Trajectory) AddItem(item TrajectoryItem) {
 type TrajectoryItem interface {
 	GetAbbreviatedText() string
 	GetText() string
+	ShouldHandoff() bool
 }
 
 type BrowserAction struct {
@@ -40,7 +41,19 @@ type BrowserAction struct {
 
 	// for navigate
 	URL string `json:"url"`
+
+	// for task_complete
+	Reason string `json:"reason"`
 }
+
+type BrowserActionType string
+
+const (
+	BrowserActionTypeClick        BrowserActionType = "click"
+	BrowserActionTypeSendKeys     BrowserActionType = "send_keys"
+	BrowserActionTypeNavigate     BrowserActionType = "navigate"
+	BrowserActionTypeTaskComplete BrowserActionType = "task_complete"
+)
 
 func NewBrowserClickAction(id virtualid.VirtualID) TrajectoryItem {
 	return &BrowserAction{
@@ -64,6 +77,13 @@ func NewBrowserNavigateAction(url string) TrajectoryItem {
 	}
 }
 
+func NewBrowserTaskCompleteAction(reason string) TrajectoryItem {
+	return &BrowserAction{
+		Type:   BrowserActionTypeTaskComplete,
+		Reason: reason,
+	}
+}
+
 func (ba *BrowserAction) GetText() string {
 	switch ba.Type {
 	case BrowserActionTypeClick:
@@ -72,6 +92,8 @@ func (ba *BrowserAction) GetText() string {
 		return fmt.Sprintf("%s(id=%s, text=%s)", ba.Type, ba.ID, ba.Text)
 	case BrowserActionTypeNavigate:
 		return fmt.Sprintf("%s(url=%s)", ba.Type, ba.URL)
+	case BrowserActionTypeTaskComplete:
+		return fmt.Sprintf("%s(reason=%s)", ba.Type, ba.Reason)
 	default:
 		panic(fmt.Sprintf("unsupported browser action type: %s", ba.Type))
 	}
@@ -82,13 +104,9 @@ func (ba *BrowserAction) GetAbbreviatedText() string {
 	return ba.GetText()
 }
 
-type BrowserActionType string
-
-const (
-	BrowserActionTypeClick    BrowserActionType = "click"
-	BrowserActionTypeSendKeys BrowserActionType = "send_keys"
-	BrowserActionTypeNavigate BrowserActionType = "navigate"
-)
+func (ba *BrowserAction) ShouldHandoff() bool {
+	return ba.Type == BrowserActionTypeTaskComplete
+}
 
 type BrowserObservation struct {
 	Text            string
@@ -107,6 +125,10 @@ func (bo *BrowserObservation) GetText() string {
 
 func (bo *BrowserObservation) GetAbbreviatedText() string {
 	return bo.TextAbbreviated
+}
+
+func (bo *BrowserObservation) ShouldHandoff() bool {
+	return false
 }
 
 type Message struct {
@@ -147,4 +169,8 @@ func (m *Message) GetAbbreviatedText() string {
 		return fmt.Sprintf("%s...", text[:DefaultAgentMessageAbbreviationLength])
 	}
 	return text
+}
+
+func (m *Message) ShouldHandoff() bool {
+	return true
 }
