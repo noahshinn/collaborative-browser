@@ -158,6 +158,11 @@ func parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, 
 			return nil, fmt.Errorf("required argument %s was not supplied", required)
 		}
 	}
+	for argName := range args {
+		if _, ok := functions[name].Parameters.Properties[argName]; !ok {
+			return nil, fmt.Errorf("unsupported argument %s was supplied", argName)
+		}
+	}
 	switch name {
 	case "click":
 		return trajectory.NewBrowserClickAction(virtualid.VirtualID(args["id"].(string))), nil
