@@ -79,22 +79,6 @@ func (m *OpenAIModel) buildArgs(messages []*Message, options *MessageOptions) ma
 	return args
 }
 
-func (m *OpenAIModel) Action(ctx context.Context, messages []*Message, options *MessageOptions) (*Action, error) {
-	args := m.buildArgs(messages, options)
-	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
-		return nil, err
-	} else if message, err := parseMessageResponse(response); err != nil {
-		return nil, err
-	} else if message.FunctionCall == nil {
-		return nil, &Error{Message: "invalid response, no function call"}
-	} else {
-		return &Action{
-			Name:      message.FunctionCall.Name,
-			Arguments: message.FunctionCall.Arguments,
-		}, nil
-	}
-}
-
 type Error struct {
 	Code    string
 	Message string

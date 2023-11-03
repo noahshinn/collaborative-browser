@@ -5,17 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"webbot/compilers/html2md"
 
 	"github.com/chromedp/chromedp"
 )
 
 type Browser struct {
-	mu             *sync.Mutex
-	ctx            context.Context
-	cancel         context.CancelFunc
-	options        *BrowserOptions
-	currentDisplay *BrowserDisplay
-	vIDGenerator   VirtualIDGenerator
+	mu                 *sync.Mutex
+	ctx                context.Context
+	cancel             context.CancelFunc
+	options            *BrowserOptions
+	currentDisplay     *BrowserDisplay
+	vIDGenerator       VirtualIDGenerator
+	htmlToMDTranslater *html2md.HTML2MDTranslater
 }
 
 type BrowserOptions struct {
@@ -75,11 +77,24 @@ func (b *Browser) GoTo(u string) (*BrowserDisplay, error) {
 	}
 }
 
-func (b *Browser) GetDisplay() (*BrowserDisplay, error) {
-	if b.currentDisplay == nil {
-		return nil, errors.New("no display")
+type Language string
+
+const (
+	LanguageHTML Language = "html"
+	LanguageMD   Language = "md"
+)
+
+func (b *Browser) Render(language Language) (string, error) {
+	switch language {
+	case LanguageHTML:
+		// TODO: implement
+		return "", nil
+	case LanguageMD:
+		// TODO: implement
+		return "", nil
+	default:
+		return "", fmt.Errorf("unsupported language: %s", language)
 	}
-	return b.currentDisplay, nil
 }
 
 func (b *Browser) UpdateDisplay() error {

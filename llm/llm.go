@@ -66,11 +66,6 @@ const (
 	MessageRoleFunction  MessageRole = "function"
 )
 
-type Action struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
-}
-
 type StreamEvent struct {
 	Text  string
 	Error error
@@ -92,7 +87,6 @@ const FunctionCallAuto = "auto"
 type ChatModel interface {
 	MessageStream(ctx context.Context, messages []*Message, options *MessageOptions) (chan StreamEvent, error)
 	Message(ctx context.Context, messages []*Message, options *MessageOptions) (*Message, error)
-	Action(ctx context.Context, messages []*Message, options *MessageOptions) (*Action, error)
 }
 
 type EmbeddingModel interface {
