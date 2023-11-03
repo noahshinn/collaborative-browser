@@ -42,17 +42,18 @@ type BrowserAction struct {
 	// for navigate
 	URL string `json:"url"`
 
-	// for task_complete
+	// for task_complete or task_not_possible
 	Reason string `json:"reason"`
 }
 
 type BrowserActionType string
 
 const (
-	BrowserActionTypeClick        BrowserActionType = "click"
-	BrowserActionTypeSendKeys     BrowserActionType = "send_keys"
-	BrowserActionTypeNavigate     BrowserActionType = "navigate"
-	BrowserActionTypeTaskComplete BrowserActionType = "task_complete"
+	BrowserActionTypeClick           BrowserActionType = "click"
+	BrowserActionTypeSendKeys        BrowserActionType = "send_keys"
+	BrowserActionTypeNavigate        BrowserActionType = "navigate"
+	BrowserActionTypeTaskComplete    BrowserActionType = "task_complete"
+	BrowserActionTypeTaskNotPossible BrowserActionType = "task_not_possible"
 )
 
 func NewBrowserClickAction(id virtualid.VirtualID) TrajectoryItem {
@@ -84,6 +85,13 @@ func NewBrowserTaskCompleteAction(reason string) TrajectoryItem {
 	}
 }
 
+func NewBrowserTaskNotPossibleAction(reason string) TrajectoryItem {
+	return &BrowserAction{
+		Type:   BrowserActionTypeTaskNotPossible,
+		Reason: reason,
+	}
+}
+
 func (ba *BrowserAction) GetText() string {
 	switch ba.Type {
 	case BrowserActionTypeClick:
@@ -93,6 +101,8 @@ func (ba *BrowserAction) GetText() string {
 	case BrowserActionTypeNavigate:
 		return fmt.Sprintf("%s(url=%s)", ba.Type, ba.URL)
 	case BrowserActionTypeTaskComplete:
+		return fmt.Sprintf("%s(reason=%s)", ba.Type, ba.Reason)
+	case BrowserActionTypeTaskNotPossible:
 		return fmt.Sprintf("%s(reason=%s)", ba.Type, ba.Reason)
 	default:
 		panic(fmt.Sprintf("unsupported browser action type: %s", ba.Type))
@@ -105,7 +115,7 @@ func (ba *BrowserAction) GetAbbreviatedText() string {
 }
 
 func (ba *BrowserAction) ShouldHandoff() bool {
-	return ba.Type == BrowserActionTypeTaskComplete
+	return ba.Type == BrowserActionTypeTaskComplete || ba.Type == BrowserActionTypeTaskNotPossible
 }
 
 type BrowserObservation struct {

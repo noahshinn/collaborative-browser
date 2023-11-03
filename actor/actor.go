@@ -8,7 +8,6 @@ import (
 	"webbot/browser/virtualid"
 	"webbot/llm"
 	"webbot/runner/trajectory"
-	"webbot/utils/slicesx"
 )
 
 type Actor interface {
@@ -25,6 +24,99 @@ func NewLLMActor(chatModel llm.ChatModel) Actor {
 
 const systemPromptToActOnBrowser = "Take an action on the browser."
 
+var permissibleFunctions = []*llm.FunctionDef{
+	{
+		Name: "click",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"id": {
+					Type:        "string",
+					Description: "The id of the element to click",
+				},
+			},
+			Required: []string{"id"},
+		},
+	},
+	{
+		Name: "send_keys",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"id": {
+					Type:        "string",
+					Description: "The id of the element to send keys to",
+				},
+				"text": {
+					Type:        "string",
+					Description: "The text to send to the element",
+				},
+			},
+			Required: []string{"id", "text"},
+		},
+	},
+	{
+		Name: "navigate",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"url": {
+					Type:        "string",
+					Description: "The url to navigate the browser to",
+				},
+			},
+			Required: []string{"url"},
+		},
+	},
+	{
+		Name: "message",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"text": {
+					Type:        "string",
+					Description: "The text for a message to send to the user",
+				},
+			},
+			Required: []string{"text"},
+		},
+	},
+	{
+		Name: "task_complete",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"reason": {
+					Type:        "string",
+					Description: "The reason that the task is complete",
+				},
+			},
+			Required: []string{"reason"},
+		},
+	},
+	{
+		Name: "task_not_possible",
+		Parameters: llm.Parameters{
+			Type: "object",
+			Properties: map[string]llm.Property{
+				"reason": {
+					Type:        "string",
+					Description: "The reason that it is not possible to complete the task",
+				},
+			},
+			Required: []string{"reason"},
+		},
+	},
+}
+
+func permissibleFunctionMap() map[string]*llm.FunctionDef {
+	m := make(map[string]*llm.FunctionDef)
+	for _, functionDef := range permissibleFunctions {
+		m[functionDef.Name] = functionDef
+	}
+	return m
+}
+
 func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error) {
 	messages := []*llm.Message{
 		{
@@ -36,121 +128,50 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.Tra
 			Content: state,
 		},
 	}
-	functions := []llm.FunctionDef{
-		{
-			Name: "click",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"id": {
-						Type:        "string",
-						Description: "The id of the element to click",
-					},
-				},
-				Required: []string{"id"},
-			},
-		},
-		{
-			Name: "send_keys",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"id": {
-						Type:        "string",
-						Description: "The id of the element to send keys to",
-					},
-					"text": {
-						Type:        "string",
-						Description: "The text to send to the element",
-					},
-				},
-				Required: []string{"id", "text"},
-			},
-		},
-		{
-			Name: "navigate",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"url": {
-						Type:        "string",
-						Description: "The url to navigate the browser to",
-					},
-				},
-				Required: []string{"url"},
-			},
-		},
-		{
-			Name: "message",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"text": {
-						Type:        "string",
-						Description: "The text for a message to send to the user",
-					},
-				},
-				Required: []string{"text"},
-			},
-		},
-		{
-			Name: "task_complete",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"reason": {
-						Type:        "string",
-						Description: "The reason that the task is complete or cannot be completed",
-					},
-				},
-				Required: []string{"reason"},
-			},
-		},
-	}
-	permissibleActionNames := slicesx.Map(functions, func(function llm.FunctionDef) string { return function.Name })
 	if res, err := a.ChatModel.Message(ctx, messages, &llm.MessageOptions{
 		Temperature: 0.0,
-		Functions:   functions,
+		Functions:   permissibleFunctions,
 	}); err != nil {
 		return nil, err
 	} else if res.FunctionCall == nil {
 		return nil, errors.New("no function call")
-	} else if res.FunctionCall.Name == "" || !slicesx.Contains(permissibleActionNames, res.FunctionCall.Name) {
+	} else if _, ok := permissibleFunctionMap()[res.FunctionCall.Name]; !ok {
 		return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
+	} else if nextAction, err := parseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {
+		return nil, err
 	} else {
-		var args map[string]any
-		if err := json.Unmarshal([]byte(res.FunctionCall.Arguments), &args); err != nil {
-			return nil, fmt.Errorf("error unmarshaling function call arguments: %w", err)
+		return nextAction, nil
+	}
+}
+
+func parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
+	var args map[string]any
+	functions := permissibleFunctionMap()
+	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		return nil, fmt.Errorf("error unmarshaling function call arguments: %w", err)
+	}
+	if _, ok := functions[name]; !ok {
+		return nil, fmt.Errorf("unsupported action was attempted: %s", name)
+	}
+	for _, required := range functions[name].Parameters.Required {
+		if _, ok := args[required]; !ok {
+			return nil, fmt.Errorf("required argument %s was not supplied", required)
 		}
-		switch res.FunctionCall.Name {
-		case "click":
-			if id, ok := args["id"].(string); !ok {
-				return nil, errors.New("\"click\" action was taken but no id was supplied")
-			} else {
-				return trajectory.NewBrowserClickAction(virtualid.VirtualID(id)), nil
-			}
-		case "send_keys":
-			if id, ok := args["id"].(string); !ok {
-				return nil, errors.New("\"send_keys\" action was taken but no id was supplied")
-			} else if text, ok := args["text"].(string); !ok || text == "" {
-				return nil, errors.New("\"send_keys\" action was taken but no text was supplied")
-			} else {
-				return trajectory.NewBrowserSendKeysAction(virtualid.VirtualID(id), text), nil
-			}
-		case "navigate":
-			if url, ok := args["url"].(string); !ok {
-				return nil, errors.New("\"navigate\" action was taken but no url was supplied")
-			} else {
-				return trajectory.NewBrowserNavigateAction(url), nil
-			}
-		case "message":
-			if text, ok := args["text"].(string); !ok || text == "" {
-				return nil, errors.New("\"message\" action was taken but no text was supplied")
-			} else {
-				return trajectory.NewAgentMessage(text), nil
-			}
-		default:
-			return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
-		}
+	}
+	switch name {
+	case "click":
+		return trajectory.NewBrowserClickAction(virtualid.VirtualID(args["id"].(string))), nil
+	case "send_keys":
+		return trajectory.NewBrowserSendKeysAction(virtualid.VirtualID(args["id"].(string)), args["text"].(string)), nil
+	case "navigate":
+		return trajectory.NewBrowserNavigateAction(args["url"].(string)), nil
+	case "message":
+		return trajectory.NewAgentMessage(args["text"].(string)), nil
+	case "task_complete":
+		return trajectory.NewBrowserTaskCompleteAction(args["reason"].(string)), nil
+	case "task_not_possible":
+		return trajectory.NewBrowserTaskNotPossibleAction(args["reason"].(string)), nil
+	default:
+		return nil, fmt.Errorf("unsupported action was attempted: %s", name)
 	}
 }

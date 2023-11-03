@@ -83,8 +83,8 @@ type MessageOptions struct {
 	StopSequences []string `json:"stop_sequences"`
 
 	// for OpenAI models
-	Functions    []FunctionDef `json:"functions"`
-	FunctionCall string        `json:"function_call"`
+	Functions    []*FunctionDef `json:"functions"`
+	FunctionCall string         `json:"function_call"`
 }
 
 const FunctionCallNone = "none"
