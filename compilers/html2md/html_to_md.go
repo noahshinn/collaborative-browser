@@ -9,7 +9,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-type HTML2MDTranslater struct{}
+type HTML2MDTranslater struct {
+	Buttons    map[string]struct{}
+	TextInputs map[string]struct{}
+}
 
 // TODO: implement ID generator
 var idCounter int = 0
@@ -37,6 +40,11 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 		content := t.visitChildren(n)
 		switch n.Data {
 		case "button":
+			// REMOVE
+			// print all attributes
+			for _, attr := range n.Attr {
+				fmt.Printf("button attr: %v\n", attr)
+			}
 			text := strings.Join(content, "")
 			id := idCounter
 			idCounter++

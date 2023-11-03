@@ -2,40 +2,26 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"webbot/llm"
+	"log"
+
+	"github.com/chromedp/chromedp"
 )
 
-const testInputFile = "test.html"
-const testOutputFile = "test.md"
-
 func main() {
-	// htmlText, err := utils.ReadFile(testInputFile)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// translator := &html2md.HTML2MDTranslater{}
-	// translation, err := translator.Translate(htmlText)
-	// if err != nil {
-	// 	panic(fmt.Errorf("error translating: %w", err))
-	// }
-	// utils.WriteFile(testOutputFile, translation)
-
-	ctx := context.Background()
-	models := llm.AllModels
-	model, err := models.ChatModel(string(llm.ChatModelGPT35Turbo))
+	ops := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", false))
+	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)
+	ctx, cancel := chromedp.NewContext(parentCtx)
+	defer cancel()
+	err := chromedp.Run(ctx,
+		chromedp.Navigate("https://scholar.google.com/"),
+	)
 	if err != nil {
-		panic(err)
+		log.Fatal("Error while performing the automation logic:", err)
 	}
-	messages := []llm.Message{
-		{
-			Role:    llm.MessageRoleUser,
-			Content: "hello",
-		},
-	}
-	res, err := model.Message(ctx, messages, llm.MessageOptions{Temperature: 0.0})
+	err = chromedp.Run(ctx,
+		chromedp.SendKeys(`#gs_hdr_tsi`, "transformers is all you need", chromedp.ByID, chromedp.NodeVisible),
+	)
 	if err != nil {
-		panic(err)
+		log.Fatal("Error while typing the query:", err)
 	}
-	fmt.Println(res.Content)
 }
