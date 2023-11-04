@@ -78,10 +78,11 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	}
 	message := trajectory.NewUserMessage(request)
 	runner.Trajectory.AddItem(message)
-	nextAction, err := runner.Actor.NextAction(ctx, runner.Trajectory.GetText())
+	nextAction, debugMessageDisplay, err := runner.Actor.NextAction(ctx, runner.Trajectory.GetText())
 	if err != nil {
 		return nil, fmt.Errorf("page visit was successful but the actor failed to perform the initial action: %w", err)
 	}
+	runner.Trajectory.AddItem(debugMessageDisplay)
 	runner.Trajectory.AddItem(nextAction)
 	if nextAction.ShouldHandoff() {
 		return runner, nil
@@ -99,7 +100,8 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 
 func (r *FiniteRunner) Run() error {
 	for i := 0; i < r.MaxNumSteps; i++ {
-		nextAction, err := r.runStep()
+		nextAction, debugDisplays, err := r.runStep()
+		r.Trajectory.AddItems(debugDisplays)
 		if err != nil {
 			return err
 		}
@@ -117,27 +119,35 @@ func (r *FiniteRunner) Run() error {
 	return nil
 }
 
-func (r *FiniteRunner) runStep() (trajectory.TrajectoryItem, error) {
+func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, debugDisplays []trajectory.TrajectoryItem, err error) {
 	state := r.Trajectory.GetText()
-	return r.Actor.NextAction(r.ctx, state)
+	nextAction, debugMessageDisplay, err := r.Actor.NextAction(r.ctx, state)
+	return nextAction, []trajectory.TrajectoryItem{debugMessageDisplay}, err
 }
 
 func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error) {
 	stream := make(chan *trajectory.TrajectoryStreamEvent)
+	sendTrajectoryItem := func(item trajectory.TrajectoryItem) {
+		stream <- &trajectory.TrajectoryStreamEvent{
+			TrajectoryItem: item,
+		}
+	}
+	sendErrorTrajectoryItem := func(err error) {
+		stream <- &trajectory.TrajectoryStreamEvent{
+			Error: err,
+		}
+	}
 	go func() {
 		defer close(stream)
 		for i := 0; i < r.MaxNumSteps; i++ {
-			nextAction, err := r.runStep()
+			nextAction, debugDisplays, err := r.runStep()
+			r.Trajectory.AddItems(debugDisplays)
 			if err != nil {
-				stream <- &trajectory.TrajectoryStreamEvent{
-					Error: err,
-				}
+				sendErrorTrajectoryItem(err)
 				return
 			}
 			r.Trajectory.AddItem(nextAction)
-			stream <- &trajectory.TrajectoryStreamEvent{
-				TrajectoryItem: nextAction,
-			}
+			sendTrajectoryItem(nextAction)
 			if nextAction.ShouldHandoff() {
 				return
 			}
@@ -149,17 +159,16 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 				}
 				return
 			}
+			debugBrowserDisplay := trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, pageRender)
 			observation := trajectory.NewBrowserObservation(pageRender, location)
+			r.Trajectory.AddItem(debugBrowserDisplay)
 			r.Trajectory.AddItem(observation)
-			stream <- &trajectory.TrajectoryStreamEvent{
-				TrajectoryItem: observation,
-			}
+			sendTrajectoryItem(debugBrowserDisplay)
+			sendTrajectoryItem(observation)
 		}
 		errorMaxNumStepsReached := trajectory.NewErrorMaxNumStepsReached(r.MaxNumSteps)
 		r.Trajectory.AddItem(errorMaxNumStepsReached)
-		stream <- &trajectory.TrajectoryStreamEvent{
-			TrajectoryItem: errorMaxNumStepsReached,
-		}
+		sendTrajectoryItem(errorMaxNumStepsReached)
 	}()
 	return stream, nil
 }

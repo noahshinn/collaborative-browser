@@ -27,6 +27,10 @@ func (t *Trajectory) AddItem(item TrajectoryItem) {
 	t.Items = append(t.Items, item)
 }
 
+func (t *Trajectory) AddItems(items []TrajectoryItem) {
+	t.Items = append(t.Items, items...)
+}
+
 type TrajectoryItem interface {
 	GetAbbreviatedText() string
 	GetText() string
@@ -37,4 +41,15 @@ type TrajectoryItem interface {
 type TrajectoryStreamEvent struct {
 	TrajectoryItem TrajectoryItem
 	Error          error
+}
+
+type DontHandoff struct{}
+type DontRender struct{}
+
+func (d DontRender) ShouldRender() bool {
+	return false
+}
+
+func (d DontHandoff) ShouldHandoff() bool {
+	return false
 }

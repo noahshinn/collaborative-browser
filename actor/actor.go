@@ -4,113 +4,118 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"webbot/browser/virtualid"
 	"webbot/llm"
 	"webbot/trajectory"
 )
 
 type Actor interface {
-	NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error)
+	NextAction(ctx context.Context, state string) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error)
 }
 
 type LLMActor struct {
-	ChatModel llm.ChatModel
+	ChatModel            llm.ChatModel
+	SystemPrompt         string
+	PermissibleFunctions []*llm.FunctionDef
 }
 
 func NewLLMActor(chatModel llm.ChatModel) Actor {
-	return &LLMActor{ChatModel: chatModel}
+	systemPromptToActOnBrowser := "You are an AI Assistant that is using a browser. The user can see the same browser as you. Your job is to take actions on the browser as requested by the user."
+	permissibleFunctions := []*llm.FunctionDef{
+		{
+			Name: "click",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"id": {
+						Type:        "string",
+						Description: "The id of the element to click",
+					},
+				},
+				Required: []string{"id"},
+			},
+		},
+		{
+			Name: "send_keys",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"id": {
+						Type:        "string",
+						Description: "The id of the element to send keys to",
+					},
+					"text": {
+						Type:        "string",
+						Description: "The text to send to the element",
+					},
+				},
+				Required: []string{"id", "text"},
+			},
+		},
+		{
+			Name: "navigate",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"url": {
+						Type:        "string",
+						Description: "The url to navigate the browser to",
+					},
+				},
+				Required: []string{"url"},
+			},
+		},
+		{
+			Name: "message",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"text": {
+						Type:        "string",
+						Description: "The text for a message to send to the user",
+					},
+				},
+				Required: []string{"text"},
+			},
+		},
+		{
+			Name: "task_complete",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"reason": {
+						Type:        "string",
+						Description: "The reason that the task is complete",
+					},
+				},
+				Required: []string{"reason"},
+			},
+		},
+		{
+			Name: "task_not_possible",
+			Parameters: llm.Parameters{
+				Type: "object",
+				Properties: map[string]llm.Property{
+					"reason": {
+						Type:        "string",
+						Description: "The reason that it is not possible to complete the task",
+					},
+				},
+				Required: []string{"reason"},
+			},
+		},
+	}
+	return &LLMActor{
+		ChatModel:            chatModel,
+		SystemPrompt:         systemPromptToActOnBrowser,
+		PermissibleFunctions: permissibleFunctions,
+	}
 }
 
-const systemPromptToActOnBrowser = "You are an AI Assistant that is using a browser. The user can see the same browser as you. Your job is to take actions on the browser as requested by the user."
-
-var permissibleFunctions = []*llm.FunctionDef{
-	{
-		Name: "click",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"id": {
-					Type:        "string",
-					Description: "The id of the element to click",
-				},
-			},
-			Required: []string{"id"},
-		},
-	},
-	{
-		Name: "send_keys",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"id": {
-					Type:        "string",
-					Description: "The id of the element to send keys to",
-				},
-				"text": {
-					Type:        "string",
-					Description: "The text to send to the element",
-				},
-			},
-			Required: []string{"id", "text"},
-		},
-	},
-	{
-		Name: "navigate",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"url": {
-					Type:        "string",
-					Description: "The url to navigate the browser to",
-				},
-			},
-			Required: []string{"url"},
-		},
-	},
-	{
-		Name: "message",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"text": {
-					Type:        "string",
-					Description: "The text for a message to send to the user",
-				},
-			},
-			Required: []string{"text"},
-		},
-	},
-	{
-		Name: "task_complete",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"reason": {
-					Type:        "string",
-					Description: "The reason that the task is complete",
-				},
-			},
-			Required: []string{"reason"},
-		},
-	},
-	{
-		Name: "task_not_possible",
-		Parameters: llm.Parameters{
-			Type: "object",
-			Properties: map[string]llm.Property{
-				"reason": {
-					Type:        "string",
-					Description: "The reason that it is not possible to complete the task",
-				},
-			},
-			Required: []string{"reason"},
-		},
-	},
-}
-
-func permissibleFunctionMap() map[string]*llm.FunctionDef {
+func (a *LLMActor) permissibleFunctionMap() map[string]*llm.FunctionDef {
 	m := make(map[string]*llm.FunctionDef)
-	for _, functionDef := range permissibleFunctions {
+	for _, functionDef := range a.PermissibleFunctions {
 		m[functionDef.Name] = functionDef
 	}
 	return m
@@ -118,40 +123,67 @@ func permissibleFunctionMap() map[string]*llm.FunctionDef {
 
 const maxTokenContextWindowMarginProportion float32 = 0.1
 
-func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error) {
+func (a *LLMActor) NextAction(ctx context.Context, state string) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,
-			Content: systemPromptToActOnBrowser,
+			Content: a.SystemPrompt,
 		},
 		{
 			Role:    llm.MessageRoleUser,
 			Content: state,
 		},
 	}
-	approxNumTokens := llm.ApproxNumTokensInMessages(messages) + llm.ApproxNumTokensInFunctionDefs(permissibleFunctions)
+	var messageDebugDisplayItem trajectory.TrajectoryItem
+	if messageDebugDisplay, err := a.renderDebugDisplay(messages, a.PermissibleFunctions); err != nil {
+		messageDebugDisplayItem = trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeLLMMesages, fmt.Sprintf("error rendering message debug display: %s", err))
+	} else {
+		messageDebugDisplayItem = trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeLLMMesages, messageDebugDisplay)
+	}
+	approxNumTokens := llm.ApproxNumTokensInMessages(messages) + llm.ApproxNumTokensInFunctionDefs(a.PermissibleFunctions)
 	if approxNumTokens > int(float32(a.ChatModel.ContextLength())*(1-maxTokenContextWindowMarginProportion)) {
-		return trajectory.NewErrorMaxContextLengthExceeded(a.ChatModel.ContextLength(), approxNumTokens), nil
+		return trajectory.NewErrorMaxContextLengthExceeded(a.ChatModel.ContextLength(), approxNumTokens), messageDebugDisplayItem, nil
 	}
 	if res, err := a.ChatModel.Message(ctx, messages, &llm.MessageOptions{
 		Temperature: 0.0,
-		Functions:   permissibleFunctions,
+		Functions:   a.PermissibleFunctions,
 	}); err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to generate message: %w", err)
 	} else if res.FunctionCall == nil {
-		return trajectory.NewAgentMessage(res.Content), nil
-	} else if _, ok := permissibleFunctionMap()[res.FunctionCall.Name]; !ok {
-		return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
-	} else if nextAction, err := parseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {
-		return nil, err
+		return trajectory.NewAgentMessage(res.Content), messageDebugDisplayItem, nil
+	} else if _, ok := a.permissibleFunctionMap()[res.FunctionCall.Name]; !ok {
+		return nil, nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
+	} else if nextAction, err := a.parseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse next action: %w", err)
 	} else {
-		return nextAction, nil
+		return nextAction, messageDebugDisplayItem, nil
 	}
 }
 
-func parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
+func (a *LLMActor) renderDebugDisplay(messages []*llm.Message, functionDefs []*llm.FunctionDef) (string, error) {
+	messageTexts := make([]string, len(messages))
+	for i, message := range messages {
+		if message.Role == llm.MessageRoleFunction {
+			messageTexts[i] = fmt.Sprintf("%s(%s)", message.FunctionCall.Name, message.FunctionCall.Arguments)
+		} else {
+			messageTexts[i] = fmt.Sprintf("%s: %s", message.Role, message.Content)
+		}
+	}
+
+	functionDefTexts := make([]string, len(functionDefs))
+	for i, functionDef := range functionDefs {
+		b, err := json.Marshal(functionDef)
+		if err != nil {
+			return "", fmt.Errorf("error marshaling function def: %w", err)
+		}
+		functionDefTexts[i] = string(b)
+	}
+	return fmt.Sprintf("%s\n\n%s", strings.Join(messageTexts, "\n"), strings.Join(functionDefTexts, "\n")), nil
+}
+
+func (a *LLMActor) parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
 	var args map[string]any
-	functions := permissibleFunctionMap()
+	functions := a.permissibleFunctionMap()
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		return nil, fmt.Errorf("error unmarshaling function call arguments: %w", err)
 	}

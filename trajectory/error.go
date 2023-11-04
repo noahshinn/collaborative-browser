@@ -3,14 +3,8 @@ package trajectory
 import "fmt"
 
 type errorItem struct {
-}
-
-func (e *errorItem) ShouldHandoff() bool {
-	return true
-}
-
-func (e *errorItem) ShouldRender() bool {
-	return false
+	DontHandoff
+	DontRender
 }
 
 type ErrorMaxNumStepsReached struct {

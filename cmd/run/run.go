@@ -59,7 +59,7 @@ func main() {
 		for event := range stream {
 			if event.Error != nil {
 				panic(fmt.Errorf("error in stream: %w", event.Error))
-			} else {
+			} else if event.TrajectoryItem.ShouldRender() {
 				fmt.Println(event.TrajectoryItem.GetText())
 			}
 		}
