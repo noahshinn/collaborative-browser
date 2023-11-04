@@ -28,7 +28,7 @@ type BrowserOption string
 
 const (
 	BrowserOptionNotHeadless                       BrowserOption = "not-headless"
-	BrowserOptionAttemptToDisableAutomationMessage               = "attempt-to-disable-automation-message"
+	BrowserOptionAttemptToDisableAutomationMessage BrowserOption = "attempt-to-disable-automation-message"
 )
 
 type BrowserDisplay struct {
