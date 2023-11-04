@@ -12,6 +12,7 @@ import (
 
 type Runner interface {
 	Run() error
+	RunAndStream() (<-chan trajectory.TrajectoryStreamEvent, error)
 }
 
 type FiniteRunner struct {
@@ -40,6 +41,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 	} else if openaiApiKey, ok := options.ApiKeys["OPENAI_API_KEY"]; !ok {
 		return nil, fmt.Errorf("api keys must contain OPENAI_API_KEY") // for now
 	} else {
+		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
 		actor := act.NewLLMActor(allModels.DefaultChatModel)
 		browser := browser.NewBrowser(ctx, options.BrowserOptions...)
@@ -54,6 +56,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 		initialObservation := trajectory.NewBrowserObservation(pageRender)
 		trajectory := &trajectory.Trajectory{
 			Items: []trajectory.TrajectoryItem{
+				userMessage,
 				initialAction,
 				initialObservation,
 			},
@@ -110,10 +113,52 @@ func (r *FiniteRunner) Run() error {
 			r.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender))
 		}
 	}
+	r.Trajectory.AddItem(trajectory.NewErrorMaxNumStepsReached(r.MaxNumSteps))
 	return nil
 }
 
 func (r *FiniteRunner) runStep() (trajectory.TrajectoryItem, error) {
 	state := r.Trajectory.GetText()
 	return r.Actor.NextAction(r.ctx, state)
+}
+
+func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error) {
+	stream := make(chan *trajectory.TrajectoryStreamEvent)
+	go func() {
+		defer close(stream)
+		for i := 0; i < r.MaxNumSteps; i++ {
+			nextAction, err := r.runStep()
+			if err != nil {
+				stream <- &trajectory.TrajectoryStreamEvent{
+					Error: err,
+				}
+				return
+			}
+			r.Trajectory.AddItem(nextAction)
+			stream <- &trajectory.TrajectoryStreamEvent{
+				TrajectoryItem: nextAction,
+			}
+			if !nextAction.ShouldHandoff() {
+				// TODO: store the previous page render so that it doesn't have to be rerendered
+				pageRender, err := r.Browser.Render(language.LanguageMD)
+				if err != nil {
+					stream <- &trajectory.TrajectoryStreamEvent{
+						Error: fmt.Errorf("browser failed to render page: %w", err),
+					}
+					return
+				}
+				observation := trajectory.NewBrowserObservation(pageRender)
+				r.Trajectory.AddItem(observation)
+				stream <- &trajectory.TrajectoryStreamEvent{
+					TrajectoryItem: observation,
+				}
+			}
+		}
+		errorMaxNumStepsReached := trajectory.NewErrorMaxNumStepsReached(r.MaxNumSteps)
+		r.Trajectory.AddItem(errorMaxNumStepsReached)
+		stream <- &trajectory.TrajectoryStreamEvent{
+			TrajectoryItem: errorMaxNumStepsReached,
+		}
+	}()
+	return stream, nil
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
+	"webbot/compilers"
 	"webbot/compilers/html2md"
 	"webbot/runner/trajectory"
 
@@ -15,13 +16,12 @@ import (
 )
 
 type Browser struct {
-	mu                 *sync.Mutex
-	ctx                context.Context
-	cancel             context.CancelFunc
-	options            []BrowserOption
-	currentDisplay     *BrowserDisplay
-	vIDGenerator       virtualid.VirtualIDGenerator
-	htmlToMDTranslater *html2md.HTML2MDTranslater
+	mu           *sync.Mutex
+	ctx          context.Context
+	cancel       context.CancelFunc
+	options      []BrowserOption
+	vIDGenerator virtualid.VirtualIDGenerator
+	translators  map[language.Language]compilers.Translator
 }
 
 type BrowserOption string
@@ -82,21 +82,23 @@ func (b *Browser) GoTo(u string) error {
 }
 
 func (b *Browser) Render(lang language.Language) (string, error) {
-	node, err := dom.GetDocument().Do(b.ctx)
-	if err != nil {
-		return "", fmt.Errorf("error getting document: %w", err)
-	}
-	html, err := dom.GetOuterHTML().WithNodeID(node.NodeID).Do(b.ctx)
-	if err != nil {
-		return "", fmt.Errorf("error getting outer html: %w", err)
-	}
-	switch lang {
-	case language.LanguageHTML:
-		return html, nil
-	case language.LanguageMD:
-		return b.htmlToMDTranslater.Translate(html, b.vIDGenerator)
-	default:
+	var html string
+	if translator, ok := b.translators[lang]; !ok {
 		return "", fmt.Errorf("unsupported language: %s", lang)
+	} else if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		node, err := dom.GetDocument().Do(ctx)
+		if err != nil {
+			return fmt.Errorf("error getting document: %w", err)
+		}
+		html, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
+		if err != nil {
+			return fmt.Errorf("error getting outer html: %w", err)
+		}
+		return nil
+	})); err != nil {
+		return "", err
+	} else {
+		return translator.Translate(html)
 	}
 }
 
@@ -110,14 +112,18 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		default:
 		}
 	}
+	htmlToMDTranslator := html2md.NewHTML2MDTranslator(nil)
+	translatorMap := map[language.Language]compilers.Translator{
+		language.LanguageMD: htmlToMDTranslator,
+	}
 	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)
 	browserCtx, cancel := chromedp.NewContext(parentCtx)
 	return &Browser{
-		mu:             &sync.Mutex{},
-		ctx:            browserCtx,
-		cancel:         cancel,
-		options:        options,
-		currentDisplay: nil,
-		vIDGenerator:   vIDGenerator,
+		mu:           &sync.Mutex{},
+		ctx:          browserCtx,
+		cancel:       cancel,
+		options:      options,
+		vIDGenerator: vIDGenerator,
+		translators:  translatorMap,
 	}
 }

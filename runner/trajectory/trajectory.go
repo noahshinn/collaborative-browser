@@ -32,6 +32,11 @@ type TrajectoryItem interface {
 	ShouldHandoff() bool
 }
 
+type TrajectoryStreamEvent struct {
+	TrajectoryItem TrajectoryItem
+	Error          error
+}
+
 type BrowserAction struct {
 	Type BrowserActionType   `json:"type"`
 	ID   virtualid.VirtualID `json:"id"`
@@ -182,5 +187,27 @@ func (m *Message) GetAbbreviatedText() string {
 }
 
 func (m *Message) ShouldHandoff() bool {
+	return true
+}
+
+type ErrorMaxNumStepsReached struct {
+	MaxNumSteps int
+}
+
+func NewErrorMaxNumStepsReached(maxNumSteps int) TrajectoryItem {
+	return &ErrorMaxNumStepsReached{
+		MaxNumSteps: maxNumSteps,
+	}
+}
+
+func (m *ErrorMaxNumStepsReached) GetText() string {
+	return fmt.Sprintf("max num steps reached: %d", m.MaxNumSteps)
+}
+
+func (m *ErrorMaxNumStepsReached) GetAbbreviatedText() string {
+	return m.GetText()
+}
+
+func (m *ErrorMaxNumStepsReached) ShouldHandoff() bool {
 	return true
 }

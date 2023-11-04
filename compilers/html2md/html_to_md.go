@@ -6,17 +6,36 @@ import (
 	"os"
 	"strings"
 	"webbot/browser/virtualid"
+	"webbot/compilers"
 
 	"golang.org/x/net/html"
 )
 
-type HTML2MDTranslater struct {
+const DefaultMaxListDisplaySize = 5
+
+type HTML2MDTranslator struct {
 	virtualIDGenerator virtualid.VirtualIDGenerator
+	maxListDisplaySize int
 }
 
-const maxListDisplaySize = 5
+type Options struct {
+	maxListDisplaySize int
+}
 
-func (t *HTML2MDTranslater) Translate(text string, virtualIDGenerator virtualid.VirtualIDGenerator) (string, error) {
+func NewHTML2MDTranslator(options *Options) compilers.Translator {
+	maxListDisplaySize := DefaultMaxListDisplaySize
+	if options != nil {
+		if options.maxListDisplaySize > 0 {
+			maxListDisplaySize = options.maxListDisplaySize
+		}
+	}
+	return &HTML2MDTranslator{
+		virtualIDGenerator: virtualid.NewIncrIntVirtualIDGenerator(),
+		maxListDisplaySize: maxListDisplaySize,
+	}
+}
+
+func (t *HTML2MDTranslator) Translate(text string) (string, error) {
 	doc, err := html.Parse(strings.NewReader(text))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing HTML: %v\n", err)
@@ -26,7 +45,7 @@ func (t *HTML2MDTranslater) Translate(text string, virtualIDGenerator virtualid.
 	return cleanup(mdText), nil
 }
 
-func (t *HTML2MDTranslater) Visit(n *html.Node) string {
+func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 	if !shouldVisit(n) {
 		return ""
 	}
@@ -115,17 +134,17 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 		case "del":
 			return "~~" + strings.Join(content, "") + "~~"
 		case "ul", "ol":
-			if len(content) > maxListDisplaySize {
+			if len(content) > t.maxListDisplaySize {
 				// TODO: improve the button display
 				id := t.virtualIDGenerator.Generate()
-				return strings.Join(content[:maxListDisplaySize], "\n") + fmt.Sprintf("\n\n[See more](%s)", id)
+				return strings.Join(content[:t.maxListDisplaySize], "\n") + fmt.Sprintf("\n\n[See more](%s)", id)
 			}
 			return strings.Join(content, "\n")
-		case "div", "section", "body", "header", "form":
+		case "div", "section", "body", "header", "form", "dialog":
 			return strings.Join(content, "\n")
-		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset":
+		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center":
 			return strings.Join(content, "")
-		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label":
+		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image":
 			return ""
 		default:
 			fmt.Printf("Unknown element: %v\n", n.Data)
@@ -142,7 +161,7 @@ func (t *HTML2MDTranslater) Visit(n *html.Node) string {
 	}
 }
 
-func (t *HTML2MDTranslater) visitChildren(n *html.Node) []string {
+func (t *HTML2MDTranslator) visitChildren(n *html.Node) []string {
 	content := []string{}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		content = append(content, t.Visit(c))
@@ -151,6 +170,9 @@ func (t *HTML2MDTranslater) visitChildren(n *html.Node) []string {
 }
 
 func shouldVisit(n *html.Node) bool {
+	if n == nil {
+		return false
+	}
 	if n.Type != html.ElementNode {
 		return true
 	}
