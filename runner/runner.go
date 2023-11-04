@@ -49,11 +49,11 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Ru
 		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
 			return nil, fmt.Errorf("browser failed to accept initial action: %w", err)
 		}
-		pageRender, err := browser.Render(language.LanguageMD)
+		location, pageRender, err := browser.Render(language.LanguageMD)
 		if err != nil {
 			return nil, fmt.Errorf("page visit was successful but browser failed to render initial page: %w", err)
 		}
-		initialObservation := trajectory.NewBrowserObservation(pageRender)
+		initialObservation := trajectory.NewBrowserObservation(pageRender, location)
 		trajectory := &trajectory.Trajectory{
 			Items: []trajectory.TrajectoryItem{
 				userMessage,
@@ -88,10 +88,10 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	} else {
 		if err := runner.Browser.AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
 			return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
-		} else if pageRender, err := runner.Browser.Render(language.LanguageMD); err != nil {
+		} else if location, pageRender, err := runner.Browser.Render(language.LanguageMD); err != nil {
 			return nil, fmt.Errorf("page visit was successful but the browser failed to render the initial page: %w", err)
 		} else {
-			runner.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender))
+			runner.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender, location))
 			return runner, nil
 		}
 	}
@@ -106,11 +106,11 @@ func (r *FiniteRunner) Run() error {
 		r.Trajectory.AddItem(nextAction)
 		if !nextAction.ShouldHandoff() {
 			// // TODO: store the previous page render so that it doesn't have to be rerendered
-			pageRender, err := r.Browser.Render(language.LanguageMD)
+			location, pageRender, err := r.Browser.Render(language.LanguageMD)
 			if err != nil {
 				return fmt.Errorf("browser failed to render page: %w", err)
 			}
-			r.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender))
+			r.Trajectory.AddItem(trajectory.NewBrowserObservation(pageRender, location))
 		}
 	}
 	r.Trajectory.AddItem(trajectory.NewErrorMaxNumStepsReached(r.MaxNumSteps))
@@ -140,14 +140,14 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 			}
 			if !nextAction.ShouldHandoff() {
 				// TODO: store the previous page render so that it doesn't have to be rerendered
-				pageRender, err := r.Browser.Render(language.LanguageMD)
+				location, pageRender, err := r.Browser.Render(language.LanguageMD)
 				if err != nil {
 					stream <- &trajectory.TrajectoryStreamEvent{
 						Error: fmt.Errorf("browser failed to render page: %w", err),
 					}
 					return
 				}
-				observation := trajectory.NewBrowserObservation(pageRender)
+				observation := trajectory.NewBrowserObservation(pageRender, location)
 				r.Trajectory.AddItem(observation)
 				stream <- &trajectory.TrajectoryStreamEvent{
 					TrajectoryItem: observation,

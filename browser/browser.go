@@ -81,10 +81,10 @@ func (b *Browser) GoTo(u string) error {
 	return b.run(chromedp.Navigate(u))
 }
 
-func (b *Browser) Render(lang language.Language) (string, error) {
+func (b *Browser) Render(lang language.Language) (location string, content string, err error) {
 	var html string
 	if translator, ok := b.translators[lang]; !ok {
-		return "", fmt.Errorf("unsupported language: %s", lang)
+		return "", "", fmt.Errorf("unsupported language: %s", lang)
 	} else if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		node, err := dom.GetDocument().Do(ctx)
 		if err != nil {
@@ -96,9 +96,24 @@ func (b *Browser) Render(lang language.Language) (string, error) {
 		}
 		return nil
 	})); err != nil {
+		return "", "", err
+	} else if translation, err := translator.Translate(html); err != nil {
+		return "", "", fmt.Errorf("error translating html to %s: %w", lang, err)
+	} else if location, err := b.GetLocation(); err != nil {
+		return "", "", fmt.Errorf("error getting location: %w", err)
+	} else {
+		return location, translation, nil
+	}
+}
+
+func (b *Browser) GetLocation() (string, error) {
+	var url string
+	if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		return chromedp.Location(&url).Do(ctx)
+	})); err != nil {
 		return "", err
 	} else {
-		return translator.Translate(html)
+		return url, nil
 	}
 }
 

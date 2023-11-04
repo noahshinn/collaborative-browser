@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"webbot/runner"
+	"webbot/runner/trajectory"
 )
 
 func main() {
@@ -23,13 +24,18 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
+	fmt.Println(strings.Repeat("-", 80) + "\n" + "TRAJECTORY" + "\n" + strings.Repeat("-", 80))
+	for _, item := range runner.Trajectory.Items {
+		fmt.Println(item.GetAbbreviatedText())
+	}
 
 	for {
+		userInput := getUserInput()
+		runner.Trajectory.AddItem(trajectory.NewUserMessage(userInput))
 		stream, err := runner.RunAndStream()
 		if err != nil {
 			panic(fmt.Errorf("failed to run and stream: %w", err))
 		}
-		fmt.Println(strings.Repeat("-", 80) + "\n" + "TRAJECTORY" + "\n" + strings.Repeat("-", 80))
 		for event := range stream {
 			if event.Error != nil {
 				panic(fmt.Errorf("error in stream: %w", event.Error))
@@ -38,4 +44,11 @@ func main() {
 			}
 		}
 	}
+}
+
+func getUserInput() string {
+	var input string
+	fmt.Print("user: ")
+	fmt.Scanln(&input)
+	return input
 }
