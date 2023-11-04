@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	act "webbot/actor"
+	"webbot/actor/llmactor"
 	"webbot/browser"
 	"webbot/browser/language"
 	"webbot/llm"
@@ -41,7 +42,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Op
 	} else {
 		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
-		actor := act.NewLLMActor(allModels.DefaultChatModel)
+		actor := llmactor.NewLLMActor(allModels.DefaultChatModel)
 		browser := browser.NewBrowser(ctx, options.BrowserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
 		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
@@ -76,7 +77,7 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	}
 	message := trajectory.NewUserMessage(request)
 	runner.Trajectory().AddItem(message)
-	nextAction, debugMessageDisplay, err := runner.Actor().NextAction(ctx, runner.Trajectory().GetText())
+	nextAction, debugMessageDisplay, err := runner.Actor().NextAction(ctx, runner.Trajectory(), runner.Browser())
 	if err != nil {
 		return nil, fmt.Errorf("page visit was successful but the actor failed to perform the initial action: %w", err)
 	}
@@ -118,8 +119,7 @@ func (r *FiniteRunner) Run() error {
 }
 
 func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, debugDisplays []trajectory.TrajectoryItem, err error) {
-	state := r.trajectory.GetText()
-	nextAction, debugMessageDisplay, err := r.actor.NextAction(r.ctx, state)
+	nextAction, debugMessageDisplay, err := r.actor.NextAction(r.ctx, r.trajectory, r.browser)
 	if debugMessageDisplay == nil {
 		return nextAction, []trajectory.TrajectoryItem{}, nil
 	}

@@ -41,6 +41,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
+	runner.Log(*outputFilepath)
 	fmt.Println("\n" + strings.Repeat("-", 80) + "\nTRAJECTORY\n" + strings.Repeat("-", 80) + "\n")
 	for _, item := range runner.Trajectory().Items {
 		fmt.Println(item.GetAbbreviatedText())
@@ -70,7 +71,7 @@ func main() {
 				break
 			}
 			if event.TrajectoryItem.ShouldRender() {
-				fmt.Println(event.TrajectoryItem.GetText())
+				fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
 			}
 			runner.Log(*outputFilepath)
 		}
