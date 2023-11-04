@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"webbot/browser/virtualid"
 	"webbot/llm"
-	"webbot/runner/trajectory"
+	"webbot/trajectory"
 )
 
 type Actor interface {

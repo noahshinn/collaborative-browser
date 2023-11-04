@@ -3,16 +3,27 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
 	"webbot/browser"
 	"webbot/runner"
-	"webbot/runner/trajectory"
+	"webbot/trajectory"
 )
 
 func main() {
 	ctx := context.Background()
+	notHeadless := flag.Bool("not-headless", false, "run the browser in non-headless mode")
+	flag.Parse()
+
+	browserOptions := []browser.BrowserOption{
+		browser.BrowserOptionAttemptToDisableAutomationMessage,
+	}
+	if *notHeadless {
+		browserOptions = append(browserOptions, browser.BrowserOptionNotHeadless)
+	}
+
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
 	if openaiAPIKey == "" {
 		panic(fmt.Errorf("OPENAI_API_KEY must be set"))
@@ -22,10 +33,7 @@ func main() {
 		ApiKeys: map[string]string{
 			"OPENAI_API_KEY": openaiAPIKey,
 		},
-		BrowserOptions: []browser.BrowserOption{
-			browser.BrowserOptionNotHeadless,
-			browser.BrowserOptionAttemptToDisableAutomationMessage,
-		},
+		BrowserOptions: browserOptions,
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))

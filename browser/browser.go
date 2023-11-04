@@ -9,7 +9,7 @@ import (
 	"webbot/browser/virtualid"
 	"webbot/compilers"
 	"webbot/compilers/html2md"
-	"webbot/runner/trajectory"
+	"webbot/trajectory"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"

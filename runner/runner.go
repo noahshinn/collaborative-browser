@@ -7,7 +7,7 @@ import (
 	"webbot/browser"
 	"webbot/browser/language"
 	"webbot/llm"
-	"webbot/runner/trajectory"
+	"webbot/trajectory"
 )
 
 type Runner interface {
