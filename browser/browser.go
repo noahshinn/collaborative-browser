@@ -27,7 +27,7 @@ type Browser struct {
 type BrowserOption string
 
 const (
-	BrowserOptionNotHeadless                       BrowserOption = "not-headless"
+	BrowserOptionHeadful                           BrowserOption = "headful"
 	BrowserOptionAttemptToDisableAutomationMessage BrowserOption = "attempt-to-disable-automation-message"
 )
 
@@ -123,7 +123,7 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 	ops := chromedp.DefaultExecAllocatorOptions[:]
 	for _, option := range options {
 		switch option {
-		case BrowserOptionNotHeadless:
+		case BrowserOptionHeadful:
 			ops = append(ops, chromedp.Flag("headless", false))
 		case BrowserOptionAttemptToDisableAutomationMessage:
 			ops = append(ops, chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"))

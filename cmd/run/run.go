@@ -15,15 +15,15 @@ import (
 
 func main() {
 	ctx := context.Background()
-	notHeadless := flag.Bool("not-headless", false, "run the browser in non-headless mode")
+	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
 	outputFilepath := flag.String("output", "out.txt", "the filepath to write the trajectory to")
 	flag.Parse()
 
 	browserOptions := []browser.BrowserOption{
 		browser.BrowserOptionAttemptToDisableAutomationMessage,
 	}
-	if *notHeadless {
-		browserOptions = append(browserOptions, browser.BrowserOptionNotHeadless)
+	if *runHeadful {
+		browserOptions = append(browserOptions, browser.BrowserOptionHeadful)
 	}
 
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
@@ -71,6 +71,7 @@ func main() {
 			if event.TrajectoryItem.ShouldRender() {
 				fmt.Println(event.TrajectoryItem.GetText())
 			}
+			runner.Log(*outputFilepath)
 		}
 		fmt.Print("user: ")
 	}
