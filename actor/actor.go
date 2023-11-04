@@ -116,6 +116,8 @@ func permissibleFunctionMap() map[string]*llm.FunctionDef {
 	return m
 }
 
+const maxTokenContextWindowMarginProportion float32 = 0.1
+
 func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.TrajectoryItem, error) {
 	messages := []*llm.Message{
 		{
@@ -126,6 +128,10 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.Tra
 			Role:    llm.MessageRoleUser,
 			Content: state,
 		},
+	}
+	approxNumTokens := llm.ApproxNumTokensInMessages(messages) + llm.ApproxNumTokensInFunctionDefs(permissibleFunctions)
+	if approxNumTokens > int(float32(a.ChatModel.ContextLength())*(1-maxTokenContextWindowMarginProportion)) {
+		return trajectory.NewErrorMaxContextLengthExceeded(a.ChatModel.ContextLength(), approxNumTokens), nil
 	}
 	if res, err := a.ChatModel.Message(ctx, messages, &llm.MessageOptions{
 		Temperature: 0.0,

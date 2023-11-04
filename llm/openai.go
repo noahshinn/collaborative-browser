@@ -29,17 +29,30 @@ func NewOpenAIEmbeddingModel(embeddingModelID EmbeddingModelID, apiKey string) E
 	return &OpenAIEmbeddingModel{modelID: embeddingModelID, apiKey: apiKey}
 }
 
-func (m *OpenAIModel) MessageStream(ctx context.Context, messages []*Message, options *MessageOptions) (chan StreamEvent, error) {
-	// TODO: implement
-	panic("not implemented")
-}
-
 func (m *OpenAIModel) Message(ctx context.Context, messages []*Message, options *MessageOptions) (*Message, error) {
 	args := m.buildArgs(messages, options)
 	if response, err := apiRequest(ctx, m.apiKey, "/chat/completions", args); err != nil {
 		return nil, err
 	} else {
 		return parseMessageResponse(response)
+	}
+}
+
+func (m *OpenAIModel) MessageStream(ctx context.Context, messages []*Message, options *MessageOptions) (chan StreamEvent, error) {
+	// TODO: implement
+	panic("not implemented")
+}
+
+func (m *OpenAIModel) ContextLength() int {
+	switch m.modelID {
+	case ChatModelGPT35Turbo:
+		return 4096
+	case ChatModelGPT35Turbo_16K:
+		return 16000
+	case ChatModelGPT4:
+		return 8000
+	default:
+		return 4096
 	}
 }
 

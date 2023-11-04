@@ -8,22 +8,25 @@ type ChatModelID string
 type EmbeddingModelID string
 
 const (
-	ChatModelGPT35Turbo ChatModelID      = "gpt-3.5-turbo"
-	ChatModelGPT4       ChatModelID      = "gpt-4"
-	EmbeddingModelAda   EmbeddingModelID = "text-embedding-ada-002"
+	ChatModelGPT35Turbo     ChatModelID      = "gpt-3.5-turbo-0613"
+	ChatModelGPT35Turbo_16K ChatModelID      = "gpt-3.5-turbo-16k-0613"
+	ChatModelGPT4           ChatModelID      = "gpt-4-0613"
+	EmbeddingModelAda       EmbeddingModelID = "text-embedding-ada-002"
 )
 
 type Models struct {
-	DefaultChatModel      ChatModel
-	DefaultEmbeddingModel EmbeddingModel
-	ChatModels            map[ChatModelID]ChatModel
-	EmbeddingModels       map[EmbeddingModelID]EmbeddingModel
+	DefaultChatModel        ChatModel
+	DefaultLongContextModel ChatModel
+	DefaultEmbeddingModel   EmbeddingModel
+	ChatModels              map[ChatModelID]ChatModel
+	EmbeddingModels         map[EmbeddingModelID]EmbeddingModel
 }
 
 func AllModels(api_key string) Models {
 	return Models{
-		DefaultChatModel:      NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
-		DefaultEmbeddingModel: NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
+		DefaultChatModel:        NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
+		DefaultLongContextModel: NewOpenAIChatModel(ChatModelGPT35Turbo_16K, api_key),
+		DefaultEmbeddingModel:   NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
 		ChatModels: map[ChatModelID]ChatModel{
 			ChatModelGPT35Turbo: NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
 			ChatModelGPT4:       NewOpenAIChatModel(ChatModelGPT4, api_key),
@@ -93,6 +96,7 @@ const FunctionCallAuto = "auto"
 type ChatModel interface {
 	MessageStream(ctx context.Context, messages []*Message, options *MessageOptions) (chan StreamEvent, error)
 	Message(ctx context.Context, messages []*Message, options *MessageOptions) (*Message, error)
+	ContextLength() int
 }
 
 type EmbeddingModel interface {
