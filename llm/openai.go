@@ -115,10 +115,10 @@ func parseMessageResponse(response map[string]any) (*Message, error) {
 			Role:    MessageRole(message["role"].(string)),
 			Content: content,
 		}, nil
-	} else if functionCall, ok := choice["function_call"].(map[string]any); ok {
+	} else if functionCall, ok := message["function_call"].(map[string]any); ok {
 		if name, ok := functionCall["name"].(string); !ok {
 			return nil, &Error{Message: "invalid response, function call has no name"}
-		} else if functionCallArgs, ok := functionCall["args"].(string); !ok {
+		} else if functionCallArgs, ok := functionCall["arguments"].(string); !ok {
 			return nil, &Error{Message: "invalid response, function call args is not a map"}
 		} else {
 			return &Message{
