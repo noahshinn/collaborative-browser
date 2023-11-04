@@ -27,7 +27,8 @@ type Browser struct {
 type BrowserOption string
 
 const (
-	BrowserOptionNotHeadless BrowserOption = "not-headless"
+	BrowserOptionNotHeadless                       BrowserOption = "not-headless"
+	BrowserOptionAttemptToDisableAutomationMessage               = "attempt-to-disable-automation-message"
 )
 
 type BrowserDisplay struct {
@@ -124,6 +125,9 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		switch option {
 		case BrowserOptionNotHeadless:
 			ops = append(ops, chromedp.Flag("headless", false))
+		case BrowserOptionAttemptToDisableAutomationMessage:
+			ops = append(ops, chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"))
+			ops = append(ops, chromedp.Flag("enable-automation", false))
 		default:
 		}
 	}

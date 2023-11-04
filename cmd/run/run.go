@@ -24,6 +24,7 @@ func main() {
 		},
 		BrowserOptions: []browser.BrowserOption{
 			browser.BrowserOptionNotHeadless,
+			browser.BrowserOptionAttemptToDisableAutomationMessage,
 		},
 	})
 	if err != nil {
