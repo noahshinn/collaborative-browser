@@ -52,6 +52,11 @@ func main() {
 		if len(userMessageText) == 0 {
 			fmt.Print("user: ")
 			continue
+		} else if userMessageText == "exit" {
+			fmt.Println("\nexiting...")
+			break
+		} else {
+			userMessageText = strings.TrimSpace(userMessageText)
 		}
 		runner.Trajectory().AddItem(trajectory.NewUserMessage(userMessageText))
 		stream, err := runner.RunAndStream()
