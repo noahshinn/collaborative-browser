@@ -138,20 +138,21 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 			stream <- &trajectory.TrajectoryStreamEvent{
 				TrajectoryItem: nextAction,
 			}
-			if !nextAction.ShouldHandoff() {
-				// TODO: store the previous page render so that it doesn't have to be rerendered
-				location, pageRender, err := r.Browser.Render(language.LanguageMD)
-				if err != nil {
-					stream <- &trajectory.TrajectoryStreamEvent{
-						Error: fmt.Errorf("browser failed to render page: %w", err),
-					}
-					return
-				}
-				observation := trajectory.NewBrowserObservation(pageRender, location)
-				r.Trajectory.AddItem(observation)
+			if nextAction.ShouldHandoff() {
+				return
+			}
+			// TODO: store the previous page render so that it doesn't have to be rerendered
+			location, pageRender, err := r.Browser.Render(language.LanguageMD)
+			if err != nil {
 				stream <- &trajectory.TrajectoryStreamEvent{
-					TrajectoryItem: observation,
+					Error: fmt.Errorf("browser failed to render page: %w", err),
 				}
+				return
+			}
+			observation := trajectory.NewBrowserObservation(pageRender, location)
+			r.Trajectory.AddItem(observation)
+			stream <- &trajectory.TrajectoryStreamEvent{
+				TrajectoryItem: observation,
 			}
 		}
 		errorMaxNumStepsReached := trajectory.NewErrorMaxNumStepsReached(r.MaxNumSteps)

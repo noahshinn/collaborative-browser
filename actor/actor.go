@@ -3,7 +3,6 @@ package actor
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"webbot/browser/virtualid"
 	"webbot/llm"
@@ -22,7 +21,7 @@ func NewLLMActor(chatModel llm.ChatModel) Actor {
 	return &LLMActor{ChatModel: chatModel}
 }
 
-const systemPromptToActOnBrowser = "Take an action on the browser."
+const systemPromptToActOnBrowser = "You are an AI Assistant that is using a browser. The user can see the same browser as you. Your job is to take actions on the browser as requested by the user."
 
 var permissibleFunctions = []*llm.FunctionDef{
 	{
@@ -134,7 +133,7 @@ func (a *LLMActor) NextAction(ctx context.Context, state string) (trajectory.Tra
 	}); err != nil {
 		return nil, err
 	} else if res.FunctionCall == nil {
-		return nil, errors.New("no function call")
+		return trajectory.NewAgentMessage(res.Content), nil
 	} else if _, ok := permissibleFunctionMap()[res.FunctionCall.Name]; !ok {
 		return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
 	} else if nextAction, err := parseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {

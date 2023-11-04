@@ -27,7 +27,7 @@ type Browser struct {
 type BrowserOption string
 
 const (
-	BrowserOptionHeadless BrowserOption = "headless"
+	BrowserOptionNotHeadless BrowserOption = "not-headless"
 )
 
 type BrowserDisplay struct {
@@ -122,8 +122,8 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 	ops := chromedp.DefaultExecAllocatorOptions[:]
 	for _, option := range options {
 		switch option {
-		case BrowserOptionHeadless:
-			ops = append(ops, chromedp.Flag("headless", true))
+		case BrowserOptionNotHeadless:
+			ops = append(ops, chromedp.Flag("headless", false))
 		default:
 		}
 	}

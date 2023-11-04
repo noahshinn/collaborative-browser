@@ -98,24 +98,26 @@ func NewBrowserTaskNotPossibleAction(reason string) TrajectoryItem {
 }
 
 func (ba *BrowserAction) GetText() string {
+	var text string
 	switch ba.Type {
 	case BrowserActionTypeClick:
-		return fmt.Sprintf("%s(id=%s)", ba.Type, ba.ID)
+		text = fmt.Sprintf("%s(id=%s)", ba.Type, ba.ID)
 	case BrowserActionTypeSendKeys:
-		return fmt.Sprintf("%s(id=%s, text=%s)", ba.Type, ba.ID, ba.Text)
+		text = fmt.Sprintf("%s(id=%s, text=\"%s\")", ba.Type, ba.ID, ba.Text)
 	case BrowserActionTypeNavigate:
-		return fmt.Sprintf("%s(url=%s)", ba.Type, ba.URL)
+		text = fmt.Sprintf("%s(url=\"%s\")", ba.Type, ba.URL)
 	case BrowserActionTypeTaskComplete:
-		return fmt.Sprintf("%s(reason=%s)", ba.Type, ba.Reason)
+		text = fmt.Sprintf("%s(reason=\"%s\")", ba.Type, ba.Reason)
 	case BrowserActionTypeTaskNotPossible:
-		return fmt.Sprintf("%s(reason=%s)", ba.Type, ba.Reason)
+		text = fmt.Sprintf("%s(reason=\"%s\")", ba.Type, ba.Reason)
 	default:
 		panic(fmt.Sprintf("unsupported browser action type: %s", ba.Type))
 	}
+	return fmt.Sprintf("action: %s", text)
 }
 
 func (ba *BrowserAction) GetAbbreviatedText() string {
-	// there may be room to truncate some action types this
+	// there may be room to truncate some action types
 	return ba.GetText()
 }
 
@@ -136,11 +138,11 @@ func NewBrowserObservation(text string, url string) TrajectoryItem {
 }
 
 func (bo *BrowserObservation) GetText() string {
-	return bo.Text
+	return fmt.Sprintf("observation: %s", bo.Text)
 }
 
 func (bo *BrowserObservation) GetAbbreviatedText() string {
-	return fmt.Sprintf("Visited %s", bo.TextAbbreviated)
+	return fmt.Sprintf("observation: Visited %s", bo.TextAbbreviated)
 }
 
 func (bo *BrowserObservation) ShouldHandoff() bool {
@@ -202,7 +204,7 @@ func NewErrorMaxNumStepsReached(maxNumSteps int) TrajectoryItem {
 }
 
 func (m *ErrorMaxNumStepsReached) GetText() string {
-	return fmt.Sprintf("max num steps reached: %d", m.MaxNumSteps)
+	return fmt.Sprintf("error: max num steps reached: %d", m.MaxNumSteps)
 }
 
 func (m *ErrorMaxNumStepsReached) GetAbbreviatedText() string {

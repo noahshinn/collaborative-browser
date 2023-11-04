@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
 	"strings"
+	"webbot/browser"
 	"webbot/runner"
 	"webbot/runner/trajectory"
 )
@@ -20,18 +22,27 @@ func main() {
 		ApiKeys: map[string]string{
 			"OPENAI_API_KEY": openaiAPIKey,
 		},
+		BrowserOptions: []browser.BrowserOption{
+			browser.BrowserOptionNotHeadless,
+		},
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
-	fmt.Println(strings.Repeat("-", 80) + "\n" + "TRAJECTORY" + "\n" + strings.Repeat("-", 80))
+	fmt.Println("\n" + strings.Repeat("-", 80) + "\nTRAJECTORY\n" + strings.Repeat("-", 80) + "\n")
 	for _, item := range runner.Trajectory.Items {
 		fmt.Println(item.GetAbbreviatedText())
 	}
 
-	for {
-		userInput := getUserInput()
-		runner.Trajectory.AddItem(trajectory.NewUserMessage(userInput))
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print("user: ")
+	for scanner.Scan() {
+		userMessageText := scanner.Text()
+		if len(userMessageText) == 0 {
+			fmt.Print("user: ")
+			continue
+		}
+		runner.Trajectory.AddItem(trajectory.NewUserMessage(userMessageText))
 		stream, err := runner.RunAndStream()
 		if err != nil {
 			panic(fmt.Errorf("failed to run and stream: %w", err))
@@ -43,12 +54,6 @@ func main() {
 				fmt.Println(event.TrajectoryItem.GetText())
 			}
 		}
+		fmt.Print("user: ")
 	}
-}
-
-func getUserInput() string {
-	var input string
-	fmt.Print("user: ")
-	fmt.Scanln(&input)
-	return input
 }
