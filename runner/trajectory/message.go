@@ -45,3 +45,7 @@ func (m *Message) GetAbbreviatedText() string {
 func (m *Message) ShouldHandoff() bool {
 	return true
 }
+
+func (m *Message) ShouldRender() bool {
+	return true
+}

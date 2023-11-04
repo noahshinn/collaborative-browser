@@ -9,6 +9,10 @@ func (e *errorItem) ShouldHandoff() bool {
 	return true
 }
 
+func (e *errorItem) ShouldRender() bool {
+	return false
+}
+
 type ErrorMaxNumStepsReached struct {
 	errorItem
 	MaxNumSteps int

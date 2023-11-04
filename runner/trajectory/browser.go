@@ -6,8 +6,9 @@ import (
 )
 
 type BrowserAction struct {
-	Type BrowserActionType   `json:"type"`
-	ID   virtualid.VirtualID `json:"id"`
+	Type   BrowserActionType   `json:"type"`
+	ID     virtualid.VirtualID `json:"id"`
+	Render bool                `json:"render"`
 
 	// for send_keys
 	Text string `json:"text"`
@@ -31,23 +32,26 @@ const (
 
 func NewBrowserClickAction(id virtualid.VirtualID) TrajectoryItem {
 	return &BrowserAction{
-		Type: BrowserActionTypeClick,
-		ID:   id,
+		Type:   BrowserActionTypeClick,
+		ID:     id,
+		Render: true,
 	}
 }
 
 func NewBrowserSendKeysAction(id virtualid.VirtualID, text string) TrajectoryItem {
 	return &BrowserAction{
-		Type: BrowserActionTypeSendKeys,
-		ID:   id,
-		Text: text,
+		Type:   BrowserActionTypeSendKeys,
+		ID:     id,
+		Text:   text,
+		Render: true,
 	}
 }
 
 func NewBrowserNavigateAction(url string) TrajectoryItem {
 	return &BrowserAction{
-		Type: BrowserActionTypeNavigate,
-		URL:  url,
+		Type:   BrowserActionTypeNavigate,
+		URL:    url,
+		Render: true,
 	}
 }
 
@@ -55,6 +59,7 @@ func NewBrowserTaskCompleteAction(reason string) TrajectoryItem {
 	return &BrowserAction{
 		Type:   BrowserActionTypeTaskComplete,
 		Reason: reason,
+		Render: true,
 	}
 }
 
@@ -62,6 +67,7 @@ func NewBrowserTaskNotPossibleAction(reason string) TrajectoryItem {
 	return &BrowserAction{
 		Type:   BrowserActionTypeTaskNotPossible,
 		Reason: reason,
+		Render: true,
 	}
 }
 
@@ -93,6 +99,10 @@ func (ba *BrowserAction) ShouldHandoff() bool {
 	return ba.Type == BrowserActionTypeTaskComplete || ba.Type == BrowserActionTypeTaskNotPossible
 }
 
+func (ba *BrowserAction) ShouldRender() bool {
+	return ba.Render
+}
+
 type BrowserObservation struct {
 	Text            string
 	TextAbbreviated string
@@ -115,4 +125,8 @@ func (bo *BrowserObservation) GetAbbreviatedText() string {
 
 func (bo *BrowserObservation) ShouldHandoff() bool {
 	return false
+}
+
+func (bo *BrowserObservation) ShouldRender() bool {
+	return true
 }
