@@ -17,6 +17,7 @@ func main() {
 	ctx := context.Background()
 	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
 	outputFilepath := flag.String("output", "out.txt", "the filepath to write the trajectory to")
+	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
 	flag.Parse()
 
 	browserOptions := []browser.BrowserOption{
@@ -30,7 +31,7 @@ func main() {
 	if openaiAPIKey == "" {
 		panic(fmt.Errorf("OPENAI_API_KEY must be set"))
 	}
-	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, "https://www.google.com", &finiterunner.Options{
+	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, *initialURL, &finiterunner.Options{
 		MaxNumSteps: 5,
 		ApiKeys: map[string]string{
 			"OPENAI_API_KEY": openaiAPIKey,

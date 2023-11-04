@@ -12,6 +12,7 @@ import (
 	"webbot/trajectory"
 
 	"github.com/chromedp/cdproto/dom"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -46,7 +47,7 @@ func (b *Browser) AcceptAction(action *trajectory.BrowserAction) error {
 	case trajectory.BrowserActionTypeSendKeys:
 		return b.SendKeys(action.ID, action.Text)
 	case trajectory.BrowserActionTypeNavigate:
-		return b.GoTo(action.URL)
+		return b.Navigate(action.URL)
 	default:
 		return fmt.Errorf("unsupported browser action type: %s", action.Type)
 	}
@@ -58,12 +59,11 @@ func (b *Browser) run(actions ...chromedp.Action) error {
 	return chromedp.Run(b.ctx, actions...)
 }
 
-// TODO: implement a general wait method that is robust for almost all page loads
 func (b *Browser) Click(id virtualid.VirtualID) error {
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
 	}
-	return b.run(chromedp.Click(virtualid.VirtualIDElementQuery(id)))
+	return b.run(enableLifeCycleEvents(), clickAndWaitFor(virtualid.VirtualIDElementQuery(id), "networkIdle"))
 }
 
 func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
@@ -75,11 +75,80 @@ func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
 	return b.run(chromedp.SendKeys(virtualid.VirtualIDElementQuery(id), keys))
 }
 
-func (b *Browser) GoTo(u string) error {
+func (b *Browser) Navigate(u string) error {
 	if valid, err := IsValidURL(u); !valid {
 		return err
 	}
-	return b.run(chromedp.Navigate(u))
+	return b.run(enableLifeCycleEvents(), navigateAndWaitFor(u, "networkIdle"))
+}
+
+func enableLifeCycleEvents() chromedp.ActionFunc {
+	return func(ctx context.Context) error {
+		err := page.Enable().Do(ctx)
+		if err != nil {
+			return err
+		}
+		err = page.SetLifecycleEventsEnabled(true).Do(ctx)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+}
+
+func navigateAndWaitFor(url string, eventName string) chromedp.ActionFunc {
+	return func(ctx context.Context) error {
+		_, _, _, err := page.Navigate(url).Do(ctx)
+		if err != nil {
+			return err
+		}
+
+		return waitFor(ctx, eventName)
+	}
+}
+
+func clickAndWaitFor(id string, eventName string) chromedp.ActionFunc {
+	return func(ctx context.Context) error {
+		err := chromedp.Click(id).Do(ctx)
+		if err != nil {
+			return err
+		}
+
+		return waitFor(ctx, eventName)
+	}
+}
+
+// Implementation from https://github.com/chromedp/chromedp/issues/431#issuecomment-592950397
+// waitFor blocks until eventName is received.
+// Examples of events you can wait for:
+//
+//	init, DOMContentLoaded, firstPaint,
+//	firstContentfulPaint, firstImagePaint,
+//	firstMeaningfulPaintCandidate,
+//	load, networkAlmostIdle, firstMeaningfulPaint, networkIdle
+//
+// This is not super reliable, I've already found incidental cases where
+// networkIdle was sent before load. It's probably smart to see how
+// puppeteer implements this exactly.
+func waitFor(ctx context.Context, eventName string) error {
+	ch := make(chan struct{})
+	cctx, cancel := context.WithCancel(ctx)
+	chromedp.ListenTarget(cctx, func(ev interface{}) {
+		switch e := ev.(type) {
+		case *page.EventLifecycleEvent:
+			if e.Name == eventName {
+				cancel()
+				close(ch)
+			}
+		}
+	})
+	select {
+	case <-ch:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 }
 
 func (b *Browser) Render(lang language.Language) (location string, content string, err error) {
