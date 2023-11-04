@@ -75,11 +75,14 @@ func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
 	return b.run(chromedp.SendKeys(virtualid.VirtualIDElementQuery(id), keys))
 }
 
-func (b *Browser) Navigate(u string) error {
-	if valid, err := IsValidURL(u); !valid {
-		return err
+func (b *Browser) Navigate(URL string) error {
+	if u, err := GetCanonicalURL(URL); err != nil {
+		return fmt.Errorf("error ensuring scheme: %w", err)
+	} else if valid, err := IsValidURL(u); !valid {
+		return fmt.Errorf("invalid url %s: %w", u, err)
+	} else {
+		return b.run(enableLifeCycleEvents(), navigateAndWaitFor(u, "networkIdle"))
 	}
-	return b.run(enableLifeCycleEvents(), navigateAndWaitFor(u, "networkIdle"))
 }
 
 func enableLifeCycleEvents() chromedp.ActionFunc {
@@ -153,24 +156,24 @@ func waitFor(ctx context.Context, eventName string) error {
 
 func (b *Browser) Render(lang language.Language) (location string, content string, err error) {
 	var html string
-	if translator, ok := b.translators[lang]; !ok {
+	if location, err := b.GetLocation(); err != nil {
+		return "", "", fmt.Errorf("error getting location: %w", err)
+	} else if translator, ok := b.translators[lang]; !ok {
 		return "", "", fmt.Errorf("unsupported language: %s", lang)
 	} else if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		node, err := dom.GetDocument().Do(ctx)
 		if err != nil {
-			return fmt.Errorf("error getting document: %w", err)
+			return fmt.Errorf("error getting document for location %s: %w", location, err)
 		}
 		html, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
 		if err != nil {
-			return fmt.Errorf("error getting outer html: %w", err)
+			return fmt.Errorf("error getting outer html for location %s: %w", location, err)
 		}
 		return nil
 	})); err != nil {
 		return "", "", err
 	} else if translation, err := translator.Translate(html); err != nil {
-		return "", "", fmt.Errorf("error translating html to %s: %w", lang, err)
-	} else if location, err := b.GetLocation(); err != nil {
-		return "", "", fmt.Errorf("error getting location: %w", err)
+		return "", "", fmt.Errorf("error translating html to %s for location %s: %w", lang, location, err)
 	} else {
 		return location, translation, nil
 	}
