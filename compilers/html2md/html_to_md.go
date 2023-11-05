@@ -7,6 +7,7 @@ import (
 	"strings"
 	"webbot/browser/virtualid"
 	"webbot/compilers"
+	"webbot/utils/stringsx"
 
 	"golang.org/x/net/html"
 )
@@ -200,11 +201,9 @@ func shouldVisit(n *html.Node) bool {
 }
 
 func cleanup(mdText string) string {
-	for strings.Contains(mdText, "\n\n\n") || strings.Contains(mdText, "  ") {
-		mdText = strings.ReplaceAll(mdText, "\n\n\n", "\n\n")
-		mdText = strings.ReplaceAll(mdText, "  ", " ")
-	}
-	return strings.TrimSpace(mdText)
+	s := stringsx.ReduceNewlines(mdText, 2)
+	s = strings.ReplaceAll(s, "  ", " ")
+	return strings.TrimSpace(s)
 }
 
 func trimURL(inputURL string) string {
