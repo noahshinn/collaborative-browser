@@ -185,7 +185,7 @@ func (r *FiniteRunner) Browser() *browser.Browser {
 func (r *FiniteRunner) Log(filepath string) error {
 	trajectoryTextItems := make([]string, len(r.trajectory.Items))
 	for i, item := range r.trajectory.Items {
-		trajectoryTextItems[i] = item.GetText()
+		trajectoryTextItems[i] = item.GetAbbreviatedText()
 	}
 	if err := io.WriteStringToFile(filepath, strings.Join(trajectoryTextItems, "\n")); err != nil {
 		return fmt.Errorf("failed to write trajectory text to file: %w", err)

@@ -2,7 +2,6 @@ package trajectory
 
 import (
 	"strings"
-	"webbot/utils/slicesx"
 )
 
 type Trajectory struct {
@@ -13,9 +12,29 @@ func (t *Trajectory) GetText() string {
 	if len(t.Items) == 0 {
 		return ""
 	}
-	itemTexts := slicesx.Map(t.Items, func(item TrajectoryItem) string {
-		return item.GetAbbreviatedText()
-	})
+	itemTexts := []string{}
+	for _, item := range t.Items {
+		if item.ShouldRender() {
+			itemTexts = append(itemTexts, item.GetText())
+		}
+	}
+	return strings.Join(itemTexts, "\n")
+}
+
+func (t *Trajectory) GetAbbreviatedText() string {
+	if len(t.Items) == 0 {
+		return ""
+	}
+	itemTexts := []string{}
+	for _, item := range t.Items {
+		if item.ShouldRender() {
+			if _, ok := item.(*Message); ok {
+				return item.GetText()
+			} else {
+				return item.GetAbbreviatedText()
+			}
+		}
+	}
 	return strings.Join(itemTexts, "\n")
 }
 
@@ -39,13 +58,23 @@ type TrajectoryStreamEvent struct {
 	Error          error
 }
 
+type Handoff struct{}
 type DontHandoff struct{}
+type Render struct{}
 type DontRender struct{}
 
-func (d DontRender) ShouldRender() bool {
-	return false
+func (h Handoff) ShouldHandoff() bool {
+	return true
 }
 
 func (d DontHandoff) ShouldHandoff() bool {
+	return false
+}
+
+func (r Render) ShouldRender() bool {
+	return true
+}
+
+func (d DontRender) ShouldRender() bool {
 	return false
 }

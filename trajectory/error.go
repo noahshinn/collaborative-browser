@@ -3,8 +3,8 @@ package trajectory
 import "fmt"
 
 type errorItem struct {
-	DontHandoff
-	DontRender
+	Handoff
+	Render
 }
 
 type ErrorMaxNumStepsReached struct {

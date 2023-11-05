@@ -104,6 +104,8 @@ func (ba *BrowserAction) ShouldRender() bool {
 }
 
 type BrowserObservation struct {
+	DontHandoff
+	Render
 	Text            string
 	TextAbbreviated string
 }
@@ -120,13 +122,5 @@ func (bo *BrowserObservation) GetText() string {
 }
 
 func (bo *BrowserObservation) GetAbbreviatedText() string {
-	return fmt.Sprintf("observation: Visited %s", bo.TextAbbreviated)
-}
-
-func (bo *BrowserObservation) ShouldHandoff() bool {
-	return false
-}
-
-func (bo *BrowserObservation) ShouldRender() bool {
-	return true
+	return fmt.Sprintf("observation: Navigated to %s", bo.TextAbbreviated)
 }

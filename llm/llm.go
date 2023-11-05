@@ -15,18 +15,20 @@ const (
 )
 
 type Models struct {
-	DefaultChatModel        ChatModel
-	DefaultLongContextModel ChatModel
-	DefaultEmbeddingModel   EmbeddingModel
-	ChatModels              map[ChatModelID]ChatModel
-	EmbeddingModels         map[EmbeddingModelID]EmbeddingModel
+	DefaultChatModel            ChatModel
+	DefaultLongContextChatModel ChatModel
+	DefaultLightChatModel       ChatModel
+	DefaultEmbeddingModel       EmbeddingModel
+	ChatModels                  map[ChatModelID]ChatModel
+	EmbeddingModels             map[EmbeddingModelID]EmbeddingModel
 }
 
 func AllModels(api_key string) Models {
 	return Models{
-		DefaultChatModel:        NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
-		DefaultLongContextModel: NewOpenAIChatModel(ChatModelGPT35Turbo_16K, api_key),
-		DefaultEmbeddingModel:   NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
+		DefaultChatModel:            NewOpenAIChatModel(ChatModelGPT4, api_key),
+		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT35Turbo_16K, api_key),
+		DefaultLightChatModel:       NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
+		DefaultEmbeddingModel:       NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
 		ChatModels: map[ChatModelID]ChatModel{
 			ChatModelGPT35Turbo: NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
 			ChatModelGPT4:       NewOpenAIChatModel(ChatModelGPT4, api_key),

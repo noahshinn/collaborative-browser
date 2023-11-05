@@ -3,6 +3,8 @@ package trajectory
 import "fmt"
 
 type Message struct {
+	Render
+	Handoff
 	Author MessageAuthor
 	Text   string
 }
@@ -40,12 +42,4 @@ func (m *Message) GetAbbreviatedText() string {
 		return fmt.Sprintf("%s...", text[:DefaultAgentMessageAbbreviationLength])
 	}
 	return text
-}
-
-func (m *Message) ShouldHandoff() bool {
-	return true
-}
-
-func (m *Message) ShouldRender() bool {
-	return true
 }

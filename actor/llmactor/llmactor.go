@@ -130,14 +130,14 @@ func (a *LLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("browser failed to render page: %w", err)
 	}
-	state := fmt.Sprintf(`----- Browser -----
+	state := fmt.Sprintf(`----- START BROWSER -----
 %s
------ Browser -----
+----- END BROWSER -----
 
------ Trajectory -----
+----- START TRAJECTORY -----
 %s
------ Trajectory -----
-`, pageRender, traj.GetText())
+----- END TRAJECTORY -----
+`, pageRender, traj.GetAbbreviatedText())
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,

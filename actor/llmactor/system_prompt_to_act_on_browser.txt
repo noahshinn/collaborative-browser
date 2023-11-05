@@ -30,12 +30,12 @@ _Note: messages should be sent via the `message` action. Plain text messages are
 
 ## Example Display
 
------ Browser -----
+----- START BROWSER -----
 <the browser content in markdown>
------ Browser -----
+----- END BROWSER -----
 
------ Trajectory -----
+----- START TRAJECTORY -----
 <the trajectory items delimited by newline>
------ Trajectory -----
+----- END TRAJECTORY -----
 
 Note: the permissible actions at each step will be displayed as functions that can be invoked.

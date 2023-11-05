@@ -71,7 +71,11 @@ func main() {
 				break
 			}
 			if event.TrajectoryItem.ShouldRender() {
-				fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
+				if _, ok := event.TrajectoryItem.(*trajectory.Message); ok {
+					fmt.Println(event.TrajectoryItem.GetText())
+				} else {
+					fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
+				}
 			}
 			runner.Log(*outputFilepath)
 		}
