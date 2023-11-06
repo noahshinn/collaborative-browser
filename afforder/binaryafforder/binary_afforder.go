@@ -2,6 +2,7 @@ package binaryafforder
 
 import (
 	"context"
+	"fmt"
 	"webbot/afforder"
 	"webbot/browser"
 	"webbot/llm"
@@ -9,10 +10,24 @@ import (
 )
 
 type BinaryAfforder struct {
+	decisionRootNode    *DecisionNode
+	decisionCallbackLib map[FuncKey]func() any
 }
 
+// TODO: add path
+const decisionTreeFilepath = ""
+
 func NewBinaryAfforder(chatModel llm.ChatModel) afforder.Afforder {
-	return &BinaryAfforder{}
+	decisionRootNode, err := ParseDecisionTree(decisionTreeFilepath)
+	// TODO: figure this out
+	if err != nil {
+		panic(fmt.Errorf("error parsing decision tree: %w", err))
+	}
+	var decisionCallbackLib map[FuncKey]func() any
+	return &BinaryAfforder{
+		decisionRootNode:    decisionRootNode,
+		decisionCallbackLib: decisionCallbackLib,
+	}
 }
 
 func (ba *BinaryAfforder) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
@@ -21,7 +36,8 @@ func (ba *BinaryAfforder) NextAction(ctx context.Context, traj *trajectory.Traje
 }
 
 type DecisionNode struct {
-	Typ DecisionType
+	Typ  DecisionType
+	Name string
 
 	// for non-leaf nodes
 	Instruction string

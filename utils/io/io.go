@@ -6,12 +6,16 @@ import (
 	"os"
 )
 
-func ReadFile(filepath string) (string, error) {
+func ReadFileAsString(filepath string) (string, error) {
 	bytes, err := os.ReadFile(filepath)
 	if err != nil {
 		return "", fmt.Errorf("error reading file: %w", err)
 	}
 	return string(bytes), nil
+}
+
+func ReadFileAsBytes(filepath string) ([]byte, error) {
+	return os.ReadFile(filepath)
 }
 
 func WriteBytesToFile(filepath string, bytes []byte) error {
