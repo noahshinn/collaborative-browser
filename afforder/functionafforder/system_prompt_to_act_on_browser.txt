@@ -39,3 +39,7 @@ _Note: messages should be sent via the `message` action. Plain text messages are
 ----- END TRAJECTORY -----
 
 Note: the permissible actions at each step will be displayed as functions that can be invoked.
+
+## Important Instructions
+Your next action should logically follow the Trajectory that is presented to you. You should not unnecessarily repeat actions.
+**Look at the User messages to derive the task at hand.**

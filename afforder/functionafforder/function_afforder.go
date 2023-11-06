@@ -145,7 +145,7 @@ func (a *FunctionAfforder) NextAction(ctx context.Context, traj *trajectory.Traj
 		},
 		{
 			Role:    llm.MessageRoleUser,
-			Content: state,
+			Content: fmt.Sprintf("%s\n\nLook at the Trajectory to inform your next action.", strings.TrimSpace(state)),
 		},
 	}
 	var messageDebugDisplayItem trajectory.TrajectoryItem

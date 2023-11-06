@@ -1,7 +1,8 @@
-package classifiers
+package istask
 
 import (
 	"context"
+	"webbot/classifier/binaryclassifier"
 	"webbot/llm"
 )
 
@@ -17,7 +18,7 @@ const systemPrompt = ""
 
 const instruction = ""
 
-func NewIsTaskClassifier(model llm.ChatModel, withReasoning bool) BinaryClassifier {
+func NewIsTaskClassifier(model llm.ChatModel, withReasoning bool) binaryclassifier.BinaryClassifier {
 	return &IsTask{
 		systemPrompt:        systemPrompt,
 		instruction:         instruction,
@@ -27,5 +28,5 @@ func NewIsTaskClassifier(model llm.ChatModel, withReasoning bool) BinaryClassifi
 }
 
 func (bc *IsTask) Classify(ctx context.Context, text string) (bool, error) {
-	return LLMBinaryClassification(ctx, bc.classificationModel, bc.systemPrompt, bc.instruction, text, bc.withReasoning)
+	return binaryclassifier.LLMBinaryClassification(ctx, bc.classificationModel, bc.systemPrompt, bc.instruction, text, bc.withReasoning)
 }

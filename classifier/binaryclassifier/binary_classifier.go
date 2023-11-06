@@ -1,4 +1,4 @@
-package classifiers
+package binaryclassifier
 
 import (
 	"context"
