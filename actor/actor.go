@@ -2,10 +2,9 @@ package actor
 
 import (
 	"context"
-	"webbot/browser"
-	"webbot/trajectory"
+	"webbot/llm"
 )
 
-type Actor interface {
-	NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error)
+type StringActor interface {
+	Act(ctx context.Context, messages []*llm.Message, functionDefs []*llm.FunctionDef) (string, error)
 }

@@ -1,4 +1,4 @@
-package llmactor
+package functionafforder
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"webbot/actor"
+	"webbot/afforder"
 	"webbot/browser"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
@@ -14,7 +14,7 @@ import (
 	"webbot/trajectory"
 )
 
-type LLMActor struct {
+type FunctionAfforder struct {
 	ChatModel            llm.ChatModel
 	SystemPrompt         string
 	PermissibleFunctions []*llm.FunctionDef
@@ -23,7 +23,7 @@ type LLMActor struct {
 //go:embed system_prompt_to_act_on_browser.txt
 var systemPromptToActOnBrowser string
 
-func NewLLMActor(chatModel llm.ChatModel) actor.Actor {
+func NewFunctionAfforder(chatModel llm.ChatModel) afforder.Afforder {
 	permissibleFunctions := []*llm.FunctionDef{
 		{
 			Name: "click",
@@ -108,14 +108,14 @@ func NewLLMActor(chatModel llm.ChatModel) actor.Actor {
 			},
 		},
 	}
-	return &LLMActor{
+	return &FunctionAfforder{
 		ChatModel:            chatModel,
 		SystemPrompt:         systemPromptToActOnBrowser,
 		PermissibleFunctions: permissibleFunctions,
 	}
 }
 
-func (a *LLMActor) permissibleFunctionMap() map[string]*llm.FunctionDef {
+func (a *FunctionAfforder) permissibleFunctionMap() map[string]*llm.FunctionDef {
 	m := make(map[string]*llm.FunctionDef)
 	for _, functionDef := range a.PermissibleFunctions {
 		m[functionDef.Name] = functionDef
@@ -125,7 +125,7 @@ func (a *LLMActor) permissibleFunctionMap() map[string]*llm.FunctionDef {
 
 const maxTokenContextWindowMarginProportion float32 = 0.1
 
-func (a *LLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
+func (a *FunctionAfforder) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
 	_, pageRender, err := br.Render(language.LanguageMD)
 	if err != nil {
 		return nil, nil, fmt.Errorf("browser failed to render page: %w", err)
@@ -174,7 +174,7 @@ func (a *LLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, 
 	}
 }
 
-func (a *LLMActor) renderDebugDisplay(messages []*llm.Message, functionDefs []*llm.FunctionDef) (string, error) {
+func (a *FunctionAfforder) renderDebugDisplay(messages []*llm.Message, functionDefs []*llm.FunctionDef) (string, error) {
 	messageTexts := make([]string, len(messages))
 	for i, message := range messages {
 		if message.Role == llm.MessageRoleFunction {
@@ -195,7 +195,7 @@ func (a *LLMActor) renderDebugDisplay(messages []*llm.Message, functionDefs []*l
 	return fmt.Sprintf("%s\n\n%s", strings.Join(messageTexts, "\n"), strings.Join(functionDefTexts, "\n")), nil
 }
 
-func (a *LLMActor) parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
+func (a *FunctionAfforder) parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
 	var args map[string]any
 	functions := a.permissibleFunctionMap()
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {

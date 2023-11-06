@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	act "webbot/actor"
-	"webbot/actor/llmactor"
+	"webbot/afforder"
+	"webbot/afforder/functionafforder"
 	"webbot/browser"
 	"webbot/browser/language"
 	"webbot/llm"
@@ -16,7 +16,7 @@ import (
 
 type FiniteRunner struct {
 	ctx         context.Context
-	actor       act.Actor
+	afforder    afforder.Afforder
 	browser     *browser.Browser
 	maxNumSteps int
 	trajectory  *trajectory.Trajectory
@@ -42,7 +42,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Op
 	} else {
 		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
-		actor := llmactor.NewLLMActor(allModels.DefaultChatModel)
+		afforder := functionafforder.NewFunctionAfforder(allModels.DefaultChatModel)
 		browser := browser.NewBrowser(ctx, options.BrowserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
 		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
@@ -62,7 +62,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Op
 		}
 		return &FiniteRunner{
 			ctx:         ctx,
-			actor:       actor,
+			afforder:    afforder,
 			browser:     browser,
 			maxNumSteps: maxNumSteps,
 			trajectory:  trajectory,
@@ -77,7 +77,7 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	}
 	message := trajectory.NewUserMessage(request)
 	runner.Trajectory().AddItem(message)
-	nextAction, debugMessageDisplay, err := runner.Actor().NextAction(ctx, runner.Trajectory(), runner.Browser())
+	nextAction, debugMessageDisplay, err := runner.Afforder().NextAction(ctx, runner.Trajectory(), runner.Browser())
 	if err != nil {
 		return nil, fmt.Errorf("page visit was successful but the actor failed to perform the initial action: %w", err)
 	}
@@ -119,7 +119,7 @@ func (r *FiniteRunner) Run() error {
 }
 
 func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, debugDisplays []trajectory.TrajectoryItem, err error) {
-	nextAction, debugMessageDisplay, err := r.actor.NextAction(r.ctx, r.trajectory, r.browser)
+	nextAction, debugMessageDisplay, err := r.afforder.NextAction(r.ctx, r.trajectory, r.browser)
 	if debugMessageDisplay == nil {
 		return nextAction, []trajectory.TrajectoryItem{}, nil
 	}
@@ -174,8 +174,8 @@ func (r *FiniteRunner) Trajectory() *trajectory.Trajectory {
 	return r.trajectory
 }
 
-func (r *FiniteRunner) Actor() act.Actor {
-	return r.actor
+func (r *FiniteRunner) Afforder() afforder.Afforder {
+	return r.afforder
 }
 
 func (r *FiniteRunner) Browser() *browser.Browser {
