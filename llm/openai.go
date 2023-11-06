@@ -51,6 +51,8 @@ func (m *OpenAIModel) ContextLength() int {
 		return 16000
 	case ChatModelGPT4:
 		return 8000
+	case ChatModelGPT4Turbo:
+		return 128000
 	default:
 		return 4096
 	}
