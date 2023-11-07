@@ -29,9 +29,9 @@ func (t *Trajectory) GetAbbreviatedText() string {
 	for _, item := range t.Items {
 		if item.ShouldRender() {
 			if _, ok := item.(*Message); ok {
-				return item.GetText()
+				itemTexts = append(itemTexts, item.GetText())
 			} else {
-				return item.GetAbbreviatedText()
+				itemTexts = append(itemTexts, item.GetAbbreviatedText())
 			}
 		}
 	}
