@@ -34,8 +34,11 @@ func AllModels(api_key string) Models {
 		DefaultCheapChatModel:       NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
 		DefaultEmbeddingModel:       NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
 		ChatModels: map[ChatModelID]ChatModel{
-			ChatModelGPT35Turbo: NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
-			ChatModelGPT4:       NewOpenAIChatModel(ChatModelGPT4, api_key),
+			ChatModelGPT35Turbo:     NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
+			ChatModelGPT4:           NewOpenAIChatModel(ChatModelGPT4, api_key),
+			ChatModelGPT4Turbo:      NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
+			ChatModelGPT35Turbo_16K: NewOpenAIChatModel(ChatModelGPT35Turbo_16K, api_key),
+			ChatModelGPT4_32K:       NewOpenAIChatModel(ChatModelGPT4_32K, api_key),
 		},
 		EmbeddingModels: map[EmbeddingModelID]EmbeddingModel{
 			EmbeddingModelAda: NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
