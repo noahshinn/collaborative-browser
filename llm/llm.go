@@ -28,8 +28,8 @@ type Models struct {
 
 func AllModels(api_key string) Models {
 	return Models{
-		DefaultChatModel:            NewOpenAIChatModel(ChatModelGPT4, api_key),
-		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT4_32K, api_key),
+		DefaultChatModel:            NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
+		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
 		DefaultLightChatModel:       NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
 		DefaultCheapChatModel:       NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
 		DefaultEmbeddingModel:       NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
