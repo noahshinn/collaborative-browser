@@ -12,6 +12,7 @@ const (
 	ChatModelGPT35Turbo_16K ChatModelID      = "gpt-3.5-turbo-16k-0613"
 	ChatModelGPT4           ChatModelID      = "gpt-4-0613"
 	ChatModelGPT4Turbo      ChatModelID      = "gpt-4-1106-preview"
+	ChatModelGPT4_32K       ChatModelID      = "gpt-4-32k-0613"
 	EmbeddingModelAda       EmbeddingModelID = "text-embedding-ada-002"
 )
 
@@ -28,7 +29,7 @@ type Models struct {
 func AllModels(api_key string) Models {
 	return Models{
 		DefaultChatModel:            NewOpenAIChatModel(ChatModelGPT4, api_key),
-		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT35Turbo_16K, api_key),
+		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT4_32K, api_key),
 		DefaultLightChatModel:       NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
 		DefaultCheapChatModel:       NewOpenAIChatModel(ChatModelGPT35Turbo, api_key),
 		DefaultEmbeddingModel:       NewOpenAIEmbeddingModel(EmbeddingModelAda, api_key),
