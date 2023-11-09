@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 	"webbot/browser/virtualid"
-	"webbot/compilers"
+	"webbot/translators"
 	"webbot/utils/stringsx"
 
 	"golang.org/x/net/html"
@@ -21,17 +21,22 @@ type HTML2MDTranslator struct {
 
 type Options struct {
 	maxListDisplaySize int
+	virtualIDGenerator virtualid.VirtualIDGenerator
 }
 
-func NewHTML2MDTranslator(options *Options) compilers.Translator {
+func NewHTML2MDTranslator(options *Options) translators.Translator {
 	maxListDisplaySize := DefaultMaxListDisplaySize
+	virtualIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	if options != nil {
 		if options.maxListDisplaySize > 0 {
 			maxListDisplaySize = options.maxListDisplaySize
 		}
+		if options.virtualIDGenerator != nil {
+			virtualIDGenerator = options.virtualIDGenerator
+		}
 	}
 	return &HTML2MDTranslator{
-		virtualIDGenerator: virtualid.NewIncrIntVirtualIDGenerator(),
+		virtualIDGenerator: virtualIDGenerator,
 		maxListDisplaySize: maxListDisplaySize,
 	}
 }
@@ -102,7 +107,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		case "h5":
 			return "\n\n###### " + strings.Join(content, "")
 		case "h6":
-			return "\n\n####### " + strings.Join(content, "")
+			return "\n\n###### " + strings.Join(content, "")
 		case "title":
 			return "# " + strings.Join(content, "")
 		case "img":

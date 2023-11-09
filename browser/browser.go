@@ -7,9 +7,9 @@ import (
 	"sync"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
-	"webbot/compilers"
-	"webbot/compilers/html2md"
 	"webbot/trajectory"
+	"webbot/translators"
+	"webbot/translators/html2md"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/page"
@@ -22,7 +22,7 @@ type Browser struct {
 	cancel       context.CancelFunc
 	options      []BrowserOption
 	vIDGenerator virtualid.VirtualIDGenerator
-	translators  map[language.Language]compilers.Translator
+	translators  map[language.Language]translators.Translator
 }
 
 type BrowserOption string
@@ -204,7 +204,7 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		}
 	}
 	htmlToMDTranslator := html2md.NewHTML2MDTranslator(nil)
-	translatorMap := map[language.Language]compilers.Translator{
+	translatorMap := map[language.Language]translators.Translator{
 		language.LanguageMD: htmlToMDTranslator,
 	}
 	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)

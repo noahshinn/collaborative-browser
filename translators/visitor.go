@@ -1,4 +1,4 @@
-package compilers
+package translators
 
 import (
 	"golang.org/x/net/html"
