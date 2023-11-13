@@ -2,7 +2,6 @@ package html2md
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -100,6 +99,9 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				if text == "" {
 					text = ariaLabel
 				}
+				if strings.TrimSpace(text) == "" {
+					return fmt.Sprintf("[type=%s](%s)", typ, id)
+				}
 				return fmt.Sprintf("[%s, type=%s](%s)", text, typ, id)
 			}
 		case "b", "strong":
@@ -132,7 +134,18 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 			}
 			return fmt.Sprintf("![%s](<img>)", alt)
 		case "a":
-			return fmt.Sprintf("[%s](%s)", strings.Join(content, ""), trimURL(n.Attr[0].Val))
+			var href string
+			for _, attr := range n.Attr {
+				if attr.Key == "href" {
+					href = attr.Val
+				}
+			}
+			innerText := t.parseInnerText(content)
+			if strings.TrimSpace(href) == "" || innerText == "" {
+				return ""
+			}
+			id := t.virtualIDGenerator.Generate()
+			return fmt.Sprintf("[%s, href=%s](%s)", innerText, href, id)
 		case "li":
 			text := strings.Join(content, "")
 			if strings.TrimSpace(text) == "" {
@@ -219,18 +232,4 @@ func cleanup(mdText string) string {
 	s := stringsx.ReduceNewlines(mdText, 2)
 	s = strings.ReplaceAll(s, "  ", " ")
 	return strings.TrimSpace(s)
-}
-
-func trimURL(inputURL string) string {
-	u, err := url.Parse(inputURL)
-	if err != nil {
-		return inputURL
-	}
-	u.Scheme = ""
-	u.RawQuery = ""
-	u.User = nil
-	if u.Opaque != "" {
-		return u.Opaque
-	}
-	return u.Host + u.Path
 }

@@ -151,7 +151,6 @@ func waitFor(ctx context.Context, eventName string) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-
 }
 
 func (b *Browser) Render(lang language.Language) (location string, content string, err error) {
