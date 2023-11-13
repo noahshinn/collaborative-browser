@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"webbot/browser/virtualid"
 	"webbot/translators"
@@ -51,6 +52,12 @@ func (t *HTML2MDTranslator) Translate(text string) (string, error) {
 	return cleanup(mdText), nil
 }
 
+func (t *HTML2MDTranslator) parseInnerText(childTexts []string) string {
+	s := strings.Join(childTexts, "")
+	re := regexp.MustCompile("[^a-zA-Z0-9]+")
+	return re.ReplaceAllString(s, "")
+}
+
 func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 	if !shouldVisit(n) {
 		return ""
@@ -62,9 +69,12 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		content := t.visitChildren(n)
 		switch n.Data {
 		case "button":
-			text := strings.Join(content, "")
+			innerText := t.parseInnerText(content)
+			if innerText == "" {
+				return ""
+			}
 			id := t.virtualIDGenerator.Generate()
-			return fmt.Sprintf("[%s](%s)", text, id)
+			return fmt.Sprintf("[%s](%s)", innerText, id)
 		case "input":
 			typ := ""
 			name := ""
