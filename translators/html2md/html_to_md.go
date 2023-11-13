@@ -53,7 +53,7 @@ func (t *HTML2MDTranslator) Translate(text string) (string, error) {
 
 func (t *HTML2MDTranslator) parseInnerText(childTexts []string) string {
 	s := strings.Join(childTexts, "")
-	re := regexp.MustCompile("[^a-zA-Z0-9]+")
+	re := regexp.MustCompile(`[^a-zA-Z0-9\\s]+`)
 	return re.ReplaceAllString(s, "")
 }
 
@@ -145,7 +145,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				return ""
 			}
 			id := t.virtualIDGenerator.Generate()
-			return fmt.Sprintf("[%s, href=%s](%s)", innerText, href, id)
+			return fmt.Sprintf("[%s, href=%s](%s)", strings.TrimSpace(strings.Join(content, "")), href, id)
 		case "li":
 			text := strings.Join(content, "")
 			if strings.TrimSpace(text) == "" {
