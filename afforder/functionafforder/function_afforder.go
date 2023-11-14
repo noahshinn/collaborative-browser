@@ -126,7 +126,7 @@ func (a *FunctionAfforder) permissibleFunctionMap() map[string]*llm.FunctionDef 
 const maxTokenContextWindowMarginProportion float32 = 0.1
 
 func (a *FunctionAfforder) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
-	_, pageRender, err := br.Render(language.LanguageMD)
+	pageRender, err := br.Render(language.LanguageMD)
 	if err != nil {
 		return nil, nil, fmt.Errorf("browser failed to render page: %w", err)
 	}

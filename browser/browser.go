@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
 	"webbot/trajectory"
@@ -12,7 +13,6 @@ import (
 	"webbot/translators/html2md"
 
 	"github.com/chromedp/cdproto/dom"
-	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -23,6 +23,7 @@ type Browser struct {
 	options      []BrowserOption
 	vIDGenerator virtualid.VirtualIDGenerator
 	translators  map[language.Language]translators.Translator
+	display      *BrowserDisplay
 }
 
 type BrowserOption string
@@ -33,23 +34,33 @@ const (
 )
 
 type BrowserDisplay struct {
-	text string
-}
-
-func (bd *BrowserDisplay) Text() string {
-	return bd.text
+	HTML     string
+	MD       string
+	Location string
 }
 
 func (b *Browser) AcceptAction(action *trajectory.BrowserAction) error {
+	var err error
 	switch action.Type {
 	case trajectory.BrowserActionTypeClick:
-		return b.Click(action.ID)
+		err = b.Click(action.ID)
 	case trajectory.BrowserActionTypeSendKeys:
-		return b.SendKeys(action.ID, action.Text)
+		err = b.SendKeys(action.ID, action.Text)
 	case trajectory.BrowserActionTypeNavigate:
-		return b.Navigate(action.URL)
+		err = b.Navigate(action.URL)
 	default:
 		return fmt.Errorf("unsupported browser action type: %s", action.Type)
+	}
+	if err != nil {
+		return fmt.Errorf("error accepting action: %w", err)
+	} else if location, err := b.getLocation(); err != nil {
+		return fmt.Errorf("error getting location: %w", err)
+	} else if html, err := b.getHTML(); err != nil {
+		return fmt.Errorf("error getting html for location %s: %w", location, err)
+	} else {
+		b.display.HTML = html
+		b.display.Location = location
+		return nil
 	}
 }
 
@@ -63,7 +74,7 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
 	}
-	return b.run(enableLifeCycleEvents(), clickAndWaitFor(virtualid.VirtualIDElementQuery(id), "networkIdle"))
+	return b.run(chromedp.Click(virtualid.VirtualIDElementQuery(id)), chromedp.Sleep(1*time.Second))
 }
 
 func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
@@ -81,112 +92,73 @@ func (b *Browser) Navigate(URL string) error {
 	} else if valid, err := IsValidURL(u); !valid {
 		return fmt.Errorf("invalid url %s: %w", u, err)
 	} else {
-		return b.run(enableLifeCycleEvents(), navigateAndWaitFor(u, "networkIdle"))
+		return b.run(chromedp.Navigate(u), chromedp.Sleep(1*time.Second))
 	}
 }
 
-func enableLifeCycleEvents() chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		err := page.Enable().Do(ctx)
-		if err != nil {
-			return err
-		}
-		err = page.SetLifecycleEventsEnabled(true).Do(ctx)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
+func (b *Browser) AddVirtualIDs() string {
+	// TODO: invoke custom vID generator
+	const f = `function addDataVidAttribute() {
+	const elements = document.querySelectorAll('button, input, a');
+	let counter = 0;
+	elements.forEach(element => {
+		element.setAttribute('data-vid', "vid-" + counter.toString());
+		counter++;
+		console.log(counter);
+	});
+}
+addDataVidAttribute();`
+	return f
 }
 
-func navigateAndWaitFor(url string, eventName string) chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		_, _, _, err := page.Navigate(url).Do(ctx)
-		if err != nil {
-			return err
-		}
-
-		return waitFor(ctx, eventName)
-	}
-}
-
-func clickAndWaitFor(id string, eventName string) chromedp.ActionFunc {
-	return func(ctx context.Context) error {
-		err := chromedp.Click(id).Do(ctx)
-		if err != nil {
-			return err
-		}
-
-		return waitFor(ctx, eventName)
-	}
-}
-
-// Implementation from https://github.com/chromedp/chromedp/issues/431#issuecomment-592950397
-// waitFor blocks until eventName is received.
-// Examples of events you can wait for:
-//
-//	init, DOMContentLoaded, firstPaint,
-//	firstContentfulPaint, firstImagePaint,
-//	firstMeaningfulPaintCandidate,
-//	load, networkAlmostIdle, firstMeaningfulPaint, networkIdle
-//
-// This is not super reliable, I've already found incidental cases where
-// networkIdle was sent before load. It's probably smart to see how
-// puppeteer implements this exactly.
-func waitFor(ctx context.Context, eventName string) error {
-	ch := make(chan struct{})
-	cctx, cancel := context.WithCancel(ctx)
-	chromedp.ListenTarget(cctx, func(ev interface{}) {
-		switch e := ev.(type) {
-		case *page.EventLifecycleEvent:
-			if e.Name == eventName {
-				cancel()
-				close(ch)
-			}
-		}
-	})
-	select {
-	case <-ch:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-func (b *Browser) Render(lang language.Language) (location string, content string, err error) {
-	var html string
-	if location, err := b.GetLocation(); err != nil {
-		return "", "", fmt.Errorf("error getting location: %w", err)
+func (b *Browser) Render(lang language.Language) (content string, err error) {
+	if location, err := b.getLocation(); err != nil {
+		return "", fmt.Errorf("error getting location: %w", err)
 	} else if translator, ok := b.translators[lang]; !ok {
-		return "", "", fmt.Errorf("unsupported language: %s", lang)
-	} else if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-		node, err := dom.GetDocument().Do(ctx)
-		if err != nil {
-			return fmt.Errorf("error getting document for location %s: %w", location, err)
-		}
-		html, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
-		if err != nil {
-			return fmt.Errorf("error getting outer html for location %s: %w", location, err)
-		}
-		return nil
-	})); err != nil {
-		return "", "", err
+		return "", fmt.Errorf("unsupported language: %s", lang)
+	} else if err := b.run(chromedp.Evaluate(b.AddVirtualIDs(), nil)); err != nil {
+		return "", err
+	} else if html, err := b.getHTML(); err != nil {
+		return "", fmt.Errorf("error getting html for location %s: %w", location, err)
 	} else if translation, err := translator.Translate(html); err != nil {
-		return "", "", fmt.Errorf("error translating html to %s for location %s: %w", lang, location, err)
+		return "", fmt.Errorf("error translating html to %s for location %s: %w", lang, location, err)
 	} else {
-		return location, translation, nil
+		b.display = &BrowserDisplay{
+			HTML:     html,
+			MD:       translation,
+			Location: location,
+		}
+		return translation, nil
 	}
 }
 
-func (b *Browser) GetLocation() (string, error) {
+func (b *Browser) getLocation() (string, error) {
 	var url string
-	if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
-		return chromedp.Location(&url).Do(ctx)
-	})); err != nil {
+	if err := b.run(chromedp.Location(&url)); err != nil {
 		return "", err
 	} else {
 		return url, nil
 	}
+}
+
+func (b *Browser) getHTML() (string, error) {
+	var html string
+	if err := chromedp.Run(b.ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		node, err := dom.GetDocument().Do(ctx)
+		if err != nil {
+			return err
+		}
+		html, err = dom.GetOuterHTML().WithNodeID(node.NodeID).Do(ctx)
+		return err
+	})); err != nil {
+		return "", err
+	} else {
+		return html, nil
+	}
+}
+
+func (b *Browser) GetDisplay() *BrowserDisplay {
+	return b.display
 }
 
 func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
@@ -215,5 +187,6 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		options:      options,
 		vIDGenerator: vIDGenerator,
 		translators:  translatorMap,
+		display:      &BrowserDisplay{},
 	}
 }

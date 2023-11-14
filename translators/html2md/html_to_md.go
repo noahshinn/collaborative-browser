@@ -69,15 +69,18 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		switch n.Data {
 		case "button":
 			innerText := t.parseInnerText(content)
-			if innerText == "" {
+			var id string
+			for _, attr := range n.Attr {
+				if attr.Key == "data-vid" {
+					id = attr.Val
+				}
+			}
+			if innerText == "" || id == "" {
 				return ""
 			}
-			id := t.virtualIDGenerator.Generate()
 			return fmt.Sprintf("[%s](%s)", innerText, id)
 		case "input":
-			typ := ""
-			name := ""
-			ariaLabel := ""
+			var typ, name, ariaLabel, id string
 			for _, attr := range n.Attr {
 				switch attr.Key {
 				case "type":
@@ -86,11 +89,12 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 					name = attr.Val
 				case "aria-label":
 					ariaLabel = attr.Val
+				case "data-vid":
+					id = attr.Val
 				default:
 				}
 			}
-			id := t.virtualIDGenerator.Generate()
-			if typ == "hidden" {
+			if typ == "hidden" || id == "" {
 				return ""
 			} else if typ == "submit" {
 				return fmt.Sprintf("[%s](%s)", name, id)
@@ -134,17 +138,18 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 			}
 			return fmt.Sprintf("![%s](<img>)", alt)
 		case "a":
-			var href string
+			var href, id string
 			for _, attr := range n.Attr {
 				if attr.Key == "href" {
 					href = attr.Val
+				} else if attr.Key == "data-vid" {
+					id = attr.Val
 				}
 			}
 			innerText := t.parseInnerText(content)
-			if strings.TrimSpace(href) == "" || innerText == "" {
+			if strings.TrimSpace(href) == "" || innerText == "" || id == "" {
 				return ""
 			}
-			id := t.virtualIDGenerator.Generate()
 			return fmt.Sprintf("[%s, href=%s](%s)", strings.TrimSpace(strings.Join(content, "")), href, id)
 		case "li":
 			text := strings.Join(content, "")
@@ -162,14 +167,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 			return "---"
 		case "del":
 			return "~~" + strings.Join(content, "") + "~~"
-		case "ul", "ol":
-			if len(content) > t.maxListDisplaySize {
-				// TODO: improve the button display
-				id := t.virtualIDGenerator.Generate()
-				return strings.Join(content[:t.maxListDisplaySize], "\n") + fmt.Sprintf("\n\n[See more](%s)", id)
-			}
-			return strings.Join(content, "\n")
-		case "div", "section", "body", "header", "form", "dialog":
+		case "div", "section", "body", "header", "form", "dialog", "ul", "ol":
 			return strings.Join(content, "\n")
 		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center":
 			return strings.Join(content, "")

@@ -12,5 +12,5 @@ type Runner interface {
 	Afforder() afforder.Afforder
 	Trajectory() *trajectory.Trajectory
 	Browser() *browser.Browser
-	Log(filepath string) error
+	Log() error
 }

@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"webbot/browser"
-	"webbot/runner"
 	"webbot/runner/finiterunner"
 	"webbot/trajectory"
 )
@@ -16,7 +15,7 @@ import (
 func main() {
 	ctx := context.Background()
 	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
-	outputFilepath := flag.String("output", "out.txt", "the filepath to write the trajectory to")
+	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
 	flag.Parse()
 
@@ -31,17 +30,18 @@ func main() {
 	if openaiAPIKey == "" {
 		panic(fmt.Errorf("OPENAI_API_KEY must be set"))
 	}
-	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, *initialURL, &finiterunner.Options{
-		MaxNumSteps: 5,
-		ApiKeys: map[string]string{
-			"OPENAI_API_KEY": openaiAPIKey,
-		},
+	apiKeys := map[string]string{
+		"OPENAI_API_KEY": openaiAPIKey,
+	}
+	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, *initialURL, apiKeys, &finiterunner.Options{
+		MaxNumSteps:    5,
 		BrowserOptions: browserOptions,
+		LogPath:        *logPath,
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
-	runner.Log(*outputFilepath)
+	runner.Log()
 	fmt.Println("\n" + strings.Repeat("-", 80) + "\nTRAJECTORY\n" + strings.Repeat("-", 80) + "\n")
 	for _, item := range runner.Trajectory().Items {
 		fmt.Println(item.GetAbbreviatedText())
@@ -63,12 +63,11 @@ func main() {
 		runner.Trajectory().AddItem(trajectory.NewUserMessage(userMessageText))
 		stream, err := runner.RunAndStream()
 		if err != nil {
-			writeThenPanic(runner, *outputFilepath, fmt.Errorf("failed to run and stream: %w", err))
+			panic(fmt.Errorf("failed to run and stream: %w", err))
 		}
 		for event := range stream {
 			if event.Error != nil {
-				writeThenPanic(runner, *outputFilepath, fmt.Errorf("error in stream: %w", event.Error))
-				break
+				panic(fmt.Errorf("error in stream: %w", event.Error))
 			}
 			if event.TrajectoryItem.ShouldRender() {
 				if _, ok := event.TrajectoryItem.(*trajectory.Message); ok {
@@ -77,16 +76,8 @@ func main() {
 					fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
 				}
 			}
-			runner.Log(*outputFilepath)
+			runner.Log()
 		}
 		fmt.Print("user: ")
-	}
-}
-
-func writeThenPanic(r runner.Runner, filepath string, er error) {
-	if err := r.Log(filepath); err != nil {
-		panic(fmt.Errorf("failed to log trajectory: %w", er))
-	} else {
-		panic(er)
 	}
 }

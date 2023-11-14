@@ -3,15 +3,18 @@ package finiterunner
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"strings"
 	"webbot/afforder"
 	"webbot/afforder/functionafforder"
 	"webbot/browser"
-	"webbot/browser/language"
 	"webbot/llm"
 	"webbot/runner"
 	"webbot/trajectory"
 	"webbot/utils/io"
+
+	"github.com/yosssi/gohtml"
 )
 
 type FiniteRunner struct {
@@ -20,6 +23,7 @@ type FiniteRunner struct {
 	browser     *browser.Browser
 	maxNumSteps int
 	trajectory  *trajectory.Trajectory
+	logPath     string
 }
 
 const DefaultMaxNumSteps = 5
@@ -27,32 +31,41 @@ const DefaultMaxNumSteps = 5
 type Options struct {
 	MaxNumSteps    int
 	BrowserOptions []browser.BrowserOption
-	ApiKeys        map[string]string
+	LogPath        string
 }
 
-func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Options) (runner.Runner, error) {
+const DefaultLogPath = "log"
+
+func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map[string]string, options *Options) (runner.Runner, error) {
 	maxNumSteps := DefaultMaxNumSteps
-	if options.MaxNumSteps > 0 {
-		maxNumSteps = options.MaxNumSteps
+	logPath := DefaultLogPath
+	browserOptions := []browser.BrowserOption{}
+	if options != nil {
+		if options.MaxNumSteps > 0 {
+			maxNumSteps = options.MaxNumSteps
+		}
+		if options.LogPath != "" {
+			logPath = options.LogPath
+		}
+		if options.BrowserOptions != nil {
+			browserOptions = options.BrowserOptions
+		}
 	}
-	if options.ApiKeys == nil {
+	if apiKeys == nil {
 		return nil, fmt.Errorf("api keys must be provided")
-	} else if openaiApiKey, ok := options.ApiKeys["OPENAI_API_KEY"]; !ok {
+	} else if openaiApiKey, ok := apiKeys["OPENAI_API_KEY"]; !ok {
 		return nil, fmt.Errorf("api keys must contain OPENAI_API_KEY") // for now
 	} else {
 		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
 		afforder := functionafforder.NewFunctionAfforder(allModels.DefaultChatModel)
-		browser := browser.NewBrowser(ctx, options.BrowserOptions...)
+		browser := browser.NewBrowser(ctx, browserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
 		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
 			return nil, fmt.Errorf("browser failed to accept initial action: %w", err)
 		}
-		location, pageRender, err := browser.Render(language.LanguageMD)
-		if err != nil {
-			return nil, fmt.Errorf("page visit was successful but browser failed to render initial page: %w", err)
-		}
-		initialObservation := trajectory.NewBrowserObservation(pageRender, location)
+		browserDisplay := browser.GetDisplay()
+		initialObservation := trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location)
 		trajectory := &trajectory.Trajectory{
 			Items: []trajectory.TrajectoryItem{
 				userMessage,
@@ -66,12 +79,13 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, options *Op
 			browser:     browser,
 			maxNumSteps: maxNumSteps,
 			trajectory:  trajectory,
+			logPath:     logPath,
 		}, nil
 	}
 }
 
-func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, request string, options *Options) (runner.Runner, error) {
-	runner, err := NewFiniteRunnerFromInitialPage(ctx, url, options)
+func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, request string, apiKeys map[string]string, options *Options) (runner.Runner, error) {
+	runner, err := NewFiniteRunnerFromInitialPage(ctx, url, apiKeys, options)
 	if err != nil {
 		return nil, err
 	}
@@ -85,15 +99,12 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	runner.Trajectory().AddItem(nextAction)
 	if nextAction.ShouldHandoff() {
 		return runner, nil
+	} else if err := runner.Browser().AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
+		return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
 	} else {
-		if err := runner.Browser().AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
-			return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
-		} else if location, pageRender, err := runner.Browser().Render(language.LanguageMD); err != nil {
-			return nil, fmt.Errorf("page visit was successful but the browser failed to render the initial page: %w", err)
-		} else {
-			runner.Trajectory().AddItem(trajectory.NewBrowserObservation(pageRender, location))
-			return runner, nil
-		}
+		browserDisplay := runner.Browser().GetDisplay()
+		runner.Trajectory().AddItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
+		return runner, nil
 	}
 }
 
@@ -106,12 +117,8 @@ func (r *FiniteRunner) Run() error {
 		}
 		r.trajectory.AddItem(nextAction)
 		if !nextAction.ShouldHandoff() {
-			// // TODO: store the previous page render so that it doesn't have to be rerendered
-			location, pageRender, err := r.browser.Render(language.LanguageMD)
-			if err != nil {
-				return fmt.Errorf("browser failed to render page: %w", err)
-			}
-			r.trajectory.AddItem(trajectory.NewBrowserObservation(pageRender, location))
+			browserDisplay := r.browser.GetDisplay()
+			r.trajectory.AddItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
 		}
 	}
 	r.trajectory.AddItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
@@ -121,7 +128,7 @@ func (r *FiniteRunner) Run() error {
 func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, debugDisplays []trajectory.TrajectoryItem, err error) {
 	nextAction, debugMessageDisplay, err := r.afforder.NextAction(r.ctx, r.trajectory, r.browser)
 	if debugMessageDisplay == nil {
-		return nextAction, []trajectory.TrajectoryItem{}, nil
+		return nextAction, []trajectory.TrajectoryItem{}, err
 	}
 	return nextAction, []trajectory.TrajectoryItem{debugMessageDisplay}, err
 }
@@ -156,14 +163,9 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 			if nextAction.ShouldHandoff() {
 				return
 			}
-			// TODO: store the previous page render so that it doesn't have to be rerendered
-			location, pageRender, err := r.browser.Render(language.LanguageMD)
-			if err != nil {
-				sendErrorTrajectoryItem(fmt.Errorf("browser failed to render page: %w", err))
-				return
-			}
-			addAndSendTrajectoryItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, pageRender))
-			addAndSendTrajectoryItem(trajectory.NewBrowserObservation(pageRender, location))
+			browserDisplay := r.browser.GetDisplay()
+			addAndSendTrajectoryItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
+			addAndSendTrajectoryItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
 		}
 		addAndSendTrajectoryItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
 	}()
@@ -182,13 +184,24 @@ func (r *FiniteRunner) Browser() *browser.Browser {
 	return r.browser
 }
 
-func (r *FiniteRunner) Log(filepath string) error {
+func (r *FiniteRunner) Log() error {
+	if _, err := os.Stat(r.logPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(r.logPath, 0755); err != nil {
+			return fmt.Errorf("failed to create log directory: %w", err)
+		}
+	}
 	trajectoryTextItems := make([]string, len(r.trajectory.Items))
 	for i, item := range r.trajectory.Items {
 		trajectoryTextItems[i] = item.GetAbbreviatedText()
 	}
-	if err := io.WriteStringToFile(filepath, strings.Join(trajectoryTextItems, "\n")); err != nil {
+	browserDisplay := r.browser.GetDisplay()
+	if err := io.WriteStringToFile(path.Join(r.logPath, "traj.txt"), strings.Join(trajectoryTextItems, "\n")); err != nil {
 		return fmt.Errorf("failed to write trajectory text to file: %w", err)
+	} else if err := io.WriteStringToFile(path.Join(r.logPath, "display.md"), browserDisplay.MD); err != nil {
+		return fmt.Errorf("failed to write display markdown to file: %w", err)
+	} else if err := io.WriteStringToFile(path.Join(r.logPath, "display.html"), gohtml.Format(browserDisplay.HTML)); err != nil {
+		return fmt.Errorf("failed to write display html to file: %w", err)
+	} else {
+		return nil
 	}
-	return nil
 }
