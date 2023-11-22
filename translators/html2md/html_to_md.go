@@ -5,7 +5,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"webbot/browser/virtualid"
 	"webbot/translators"
 	"webbot/utils/stringsx"
 
@@ -15,28 +14,21 @@ import (
 const DefaultMaxListDisplaySize = 5
 
 type HTML2MDTranslator struct {
-	virtualIDGenerator virtualid.VirtualIDGenerator
 	maxListDisplaySize int
 }
 
 type Options struct {
 	maxListDisplaySize int
-	virtualIDGenerator virtualid.VirtualIDGenerator
 }
 
 func NewHTML2MDTranslator(options *Options) translators.Translator {
 	maxListDisplaySize := DefaultMaxListDisplaySize
-	virtualIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	if options != nil {
 		if options.maxListDisplaySize > 0 {
 			maxListDisplaySize = options.maxListDisplaySize
 		}
-		if options.virtualIDGenerator != nil {
-			virtualIDGenerator = options.virtualIDGenerator
-		}
 	}
 	return &HTML2MDTranslator{
-		virtualIDGenerator: virtualIDGenerator,
 		maxListDisplaySize: maxListDisplaySize,
 	}
 }
