@@ -199,6 +199,9 @@ func (a *FunctionAfforder) parseNextAction(name string, arguments string) (traje
 	var args map[string]any
 	functions := a.permissibleFunctionMap()
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
+		if name == "message" && len(arguments) > 0 {
+			return trajectory.NewAgentMessage(arguments), nil
+		}
 		return nil, fmt.Errorf("error unmarshaling function call arguments for function %s: %w, \"%s\"", name, err, arguments)
 	}
 	if _, ok := functions[name]; !ok {
