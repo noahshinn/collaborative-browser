@@ -61,11 +61,11 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 		afforder := functionafforder.NewFunctionAfforder(allModels.DefaultChatModel)
 		browser := browser.NewBrowser(ctx, browserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
-		if err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction)); err != nil {
+		observation, err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction))
+		if err != nil {
 			return nil, fmt.Errorf("browser failed to accept initial action: %w", err)
 		}
-		browserDisplay := browser.GetDisplay()
-		initialObservation := trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location)
+		initialObservation := trajectory.NewBrowserObservation(observation)
 		trajectory := &trajectory.Trajectory{
 			Items: []trajectory.TrajectoryItem{
 				userMessage,
@@ -99,11 +99,10 @@ func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, r
 	runner.Trajectory().AddItem(nextAction)
 	if nextAction.ShouldHandoff() {
 		return runner, nil
-	} else if err := runner.Browser().AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
+	} else if observation, err := runner.Browser().AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
 		return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
 	} else {
-		browserDisplay := runner.Browser().GetDisplay()
-		runner.Trajectory().AddItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
+		runner.Trajectory().AddItem(trajectory.NewBrowserObservation(observation))
 		return runner, nil
 	}
 }
@@ -116,9 +115,15 @@ func (r *FiniteRunner) Run() error {
 			return err
 		}
 		r.trajectory.AddItem(nextAction)
-		if !nextAction.ShouldHandoff() {
+		if nextAction.ShouldHandoff() {
+			return nil
+		}
+		if observation, err := r.browser.AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
+			return err
+		} else {
 			browserDisplay := r.browser.GetDisplay()
-			r.trajectory.AddItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
+			r.trajectory.AddItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
+			r.trajectory.AddItem(trajectory.NewBrowserObservation(observation))
 		}
 	}
 	r.trajectory.AddItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
@@ -163,9 +168,14 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 			if nextAction.ShouldHandoff() {
 				return
 			}
-			browserDisplay := r.browser.GetDisplay()
-			addAndSendTrajectoryItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
-			addAndSendTrajectoryItem(trajectory.NewBrowserObservation(browserDisplay.MD, browserDisplay.Location))
+			if observation, err := r.browser.AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
+				sendErrorTrajectoryItem(err)
+				return
+			} else {
+				browserDisplay := r.browser.GetDisplay()
+				addAndSendTrajectoryItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
+				addAndSendTrajectoryItem(trajectory.NewBrowserObservation(observation))
+			}
 		}
 		addAndSendTrajectoryItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
 	}()

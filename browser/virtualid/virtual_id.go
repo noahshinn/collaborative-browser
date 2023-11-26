@@ -47,5 +47,5 @@ func IsValidBaseVirtualID(id VirtualID) bool {
 }
 
 func VirtualIDElementQuery(id VirtualID) string {
-	return fmt.Sprintf("[%s=%s]", VirtualIDDataAttr, id)
+	return fmt.Sprintf(`[%s="%s"]`, VirtualIDDataAttr, id)
 }

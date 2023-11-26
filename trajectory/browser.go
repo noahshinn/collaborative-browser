@@ -110,10 +110,9 @@ type BrowserObservation struct {
 	TextAbbreviated string
 }
 
-func NewBrowserObservation(text string, url string) TrajectoryItem {
+func NewBrowserObservation(text string) TrajectoryItem {
 	return &BrowserObservation{
-		Text:            text,
-		TextAbbreviated: url,
+		Text: text,
 	}
 }
 
@@ -122,5 +121,9 @@ func (bo *BrowserObservation) GetText() string {
 }
 
 func (bo *BrowserObservation) GetAbbreviatedText() string {
-	return fmt.Sprintf("observation: Navigated to %s", bo.TextAbbreviated)
+	text := bo.Text
+	if len(text) > 100 {
+		text = text[:100] + "..."
+	}
+	return fmt.Sprintf("observation: %s", text)
 }

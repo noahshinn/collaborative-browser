@@ -39,21 +39,8 @@ type BrowserDisplay struct {
 	Location string
 }
 
-func (b *Browser) AcceptAction(action *trajectory.BrowserAction) error {
-	var err error
-	switch action.Type {
-	case trajectory.BrowserActionTypeClick:
-		err = b.Click(action.ID)
-	case trajectory.BrowserActionTypeSendKeys:
-		err = b.SendKeys(action.ID, action.Text)
-	case trajectory.BrowserActionTypeNavigate:
-		err = b.Navigate(action.URL)
-	default:
-		return fmt.Errorf("unsupported browser action type: %s", action.Type)
-	}
-	if err != nil {
-		return fmt.Errorf("error accepting action: %w", err)
-	} else if location, err := b.getLocation(); err != nil {
+func (b *Browser) updateDisplay() error {
+	if location, err := b.getLocation(); err != nil {
 		return fmt.Errorf("error getting location: %w", err)
 	} else if html, err := b.getHTML(); err != nil {
 		return fmt.Errorf("error getting html for location %s: %w", location, err)
@@ -61,6 +48,37 @@ func (b *Browser) AcceptAction(action *trajectory.BrowserAction) error {
 		b.display.HTML = html
 		b.display.Location = location
 		return nil
+	}
+}
+
+func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error) {
+	var err error
+	switch action.Type {
+	case trajectory.BrowserActionTypeClick:
+		if err = b.Click(action.ID); err != nil {
+			return "", fmt.Errorf("error clicking: %w", err)
+		} else if err = b.updateDisplay(); err != nil {
+			return "", fmt.Errorf("error updating display: %w", err)
+		}
+		return fmt.Sprintf("clicked %s", action.ID), nil
+	case trajectory.BrowserActionTypeSendKeys:
+		if err = b.SendKeys(action.ID, action.Text); err != nil {
+			return "", fmt.Errorf("error sending keys: %w", err)
+		}
+		keysDisplay := action.Text
+		if len(keysDisplay) > 10 {
+			keysDisplay = keysDisplay[:10] + "..."
+		}
+		return fmt.Sprintf("sent keys \"%s\" to %s", keysDisplay, action.ID), nil
+	case trajectory.BrowserActionTypeNavigate:
+		if err = b.Navigate(action.URL); err != nil {
+			return "", fmt.Errorf("error navigating: %w", err)
+		} else if err = b.updateDisplay(); err != nil {
+			return "", fmt.Errorf("error updating display: %w", err)
+		}
+		return fmt.Sprintf("navigated to %s", action.URL), nil
+	default:
+		return "", fmt.Errorf("unsupported browser action type: %s", action.Type)
 	}
 }
 
@@ -73,6 +91,10 @@ func (b *Browser) run(actions ...chromedp.Action) error {
 func (b *Browser) Click(id virtualid.VirtualID) error {
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
+	} else if exists, err := b.DoesVirtualIDExist(string(id)); err != nil {
+		return fmt.Errorf("error checking if virtual id exists: %w", err)
+	} else if !exists {
+		return fmt.Errorf("virtual id does not exist: %s", id)
 	}
 	return b.run(chromedp.Click(virtualid.VirtualIDElementQuery(id)), chromedp.Sleep(1*time.Second))
 }
@@ -109,6 +131,15 @@ func (b *Browser) AddVirtualIDs() string {
 }
 addDataVidAttribute();`
 	return f
+}
+
+func (b *Browser) DoesVirtualIDExist(virtualID string) (bool, error) {
+	var exists bool
+	if err := b.run(chromedp.Evaluate(fmt.Sprintf("document.querySelector('[data-vid=\"%s\"]') !== null", virtualID), &exists)); err != nil {
+		return false, err
+	} else {
+		return exists, nil
+	}
 }
 
 func (b *Browser) Render(lang language.Language) (content string, err error) {
