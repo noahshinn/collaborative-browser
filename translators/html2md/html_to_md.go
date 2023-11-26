@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"webbot/translators"
+	"webbot/utils/slicesx"
 	"webbot/utils/stringsx"
 
 	"golang.org/x/net/html"
@@ -234,7 +235,18 @@ func shouldVisit(n *html.Node) bool {
 }
 
 func cleanup(mdText string) string {
+	// remove extra newlines
 	s := stringsx.ReduceNewlines(mdText, 2)
+
+	// remove extra spaces
 	s = strings.ReplaceAll(s, "  ", " ")
+
+	// remove trailing spaces for each line
+	lines := strings.Split(s, "\n")
+	s = strings.Join(slicesx.Map(lines, func(str string) string {
+		return strings.TrimSpace(str)
+	}), "\n")
+
+	// remove leading or trailing spaces
 	return strings.TrimSpace(s)
 }
