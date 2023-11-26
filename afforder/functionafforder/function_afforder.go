@@ -199,7 +199,7 @@ func (a *FunctionAfforder) parseNextAction(name string, arguments string) (traje
 	var args map[string]any
 	functions := a.permissibleFunctionMap()
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
-		return nil, fmt.Errorf("error unmarshaling function call arguments: %w", err)
+		return nil, fmt.Errorf("error unmarshaling function call arguments for function %s: %w, \"%s\"", name, err, arguments)
 	}
 	if _, ok := functions[name]; !ok {
 		return nil, fmt.Errorf("unsupported action was attempted: %s", name)

@@ -39,6 +39,16 @@ type BrowserDisplay struct {
 	Location string
 }
 
+type ElementType string
+
+const (
+	ElementTypeButton   ElementType = "button"
+	ElementTypeInput    ElementType = "input"
+	ElementTypeLink     ElementType = "a"
+	ElementTypeTextArea ElementType = "textarea"
+	ElementTypeOther    ElementType = "other"
+)
+
 func (b *Browser) updateDisplay() error {
 	if location, err := b.getLocation(); err != nil {
 		return fmt.Errorf("error getting location: %w", err)
@@ -95,8 +105,13 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 		return fmt.Errorf("error checking if virtual id exists: %w", err)
 	} else if !exists {
 		return fmt.Errorf("virtual id does not exist: %s", id)
+	} else if elementType, err := b.CheckElementTypeForVirtualID(string(id)); err != nil {
+		return fmt.Errorf("error checking element type for virtual id: %w", err)
+	} else if elementType != ElementTypeButton && elementType != ElementTypeLink {
+		return fmt.Errorf("cannot click element type %s", elementType)
+	} else {
+		return b.ClickByVirtualID(string(id))
 	}
-	return b.run(chromedp.Click(virtualid.VirtualIDElementQuery(id)), chromedp.Sleep(1*time.Second))
 }
 
 func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
@@ -104,8 +119,17 @@ func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
 		return fmt.Errorf("invalid virtual id: %s", id)
 	} else if keys == "" {
 		return errors.New("keys cannot be empty")
+	} else if exists, err := b.DoesVirtualIDExist(string(id)); err != nil {
+		return fmt.Errorf("error checking if virtual id exists: %w", err)
+	} else if !exists {
+		return fmt.Errorf("virtual id does not exist: %s", id)
+	} else if elementType, err := b.CheckElementTypeForVirtualID(string(id)); err != nil {
+		return fmt.Errorf("error checking element type for virtual id: %w", err)
+	} else if elementType != ElementTypeInput && elementType != ElementTypeTextArea {
+		return fmt.Errorf("cannot send keys to element type %s", elementType)
+	} else {
+		return b.SendTextByVirtualID(string(id), keys)
 	}
-	return b.run(chromedp.SendKeys(virtualid.VirtualIDElementQuery(id), keys))
 }
 
 func (b *Browser) Navigate(URL string) error {
@@ -131,15 +155,6 @@ func (b *Browser) AddVirtualIDs() string {
 }
 addDataVidAttribute();`
 	return f
-}
-
-func (b *Browser) DoesVirtualIDExist(virtualID string) (bool, error) {
-	var exists bool
-	if err := b.run(chromedp.Evaluate(fmt.Sprintf("document.querySelector('[data-vid=\"%s\"]') !== null", virtualID), &exists)); err != nil {
-		return false, err
-	} else {
-		return exists, nil
-	}
 }
 
 func (b *Browser) Render(lang language.Language) (content string, err error) {
