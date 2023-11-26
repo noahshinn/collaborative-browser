@@ -18,7 +18,6 @@ Actions are events that were invoked by the User or you. The following set of ac
 `click`: Click on an element selected by Virtual ID
 `send_keys`: Send text to an element by Virtual ID
 `navigate`: Go to a different page by URL
-`task_complete`: The task requested by the User is complete
 `task_not_possible`: The task requested by the User is not possible
 
 ## Observations

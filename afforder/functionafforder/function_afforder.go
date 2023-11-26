@@ -82,19 +82,6 @@ func NewFunctionAfforder(chatModel llm.ChatModel) afforder.Afforder {
 			},
 		},
 		{
-			Name: "task_complete",
-			Parameters: llm.Parameters{
-				Type: "object",
-				Properties: map[string]llm.Property{
-					"reason": {
-						Type:        "string",
-						Description: "The reason that the task is complete",
-					},
-				},
-				Required: []string{"reason"},
-			},
-		},
-		{
 			Name: "task_not_possible",
 			Parameters: llm.Parameters{
 				Type: "object",
@@ -226,8 +213,6 @@ func (a *FunctionAfforder) parseNextAction(name string, arguments string) (traje
 		return trajectory.NewBrowserNavigateAction(args["url"].(string)), nil
 	case "message":
 		return trajectory.NewAgentMessage(args["text"].(string)), nil
-	case "task_complete":
-		return trajectory.NewBrowserTaskCompleteAction(args["reason"].(string)), nil
 	case "task_not_possible":
 		return trajectory.NewBrowserTaskNotPossibleAction(args["reason"].(string)), nil
 	default:
