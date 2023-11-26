@@ -72,7 +72,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				return ""
 			}
 			return fmt.Sprintf("[%s](%s)", innerText, id)
-		case "input":
+		case "input", "textarea":
 			var typ, name, ariaLabel, id string
 			for _, attr := range n.Attr {
 				switch attr.Key {
@@ -120,7 +120,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		case "title":
 			return "# " + strings.Join(content, "")
 		case "img":
-			alt := ""
+			var alt string
 			for _, attr := range n.Attr {
 				if attr.Key == "alt" {
 					alt = attr.Val
@@ -130,6 +130,8 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				return ""
 			}
 			return fmt.Sprintf("![%s](<img>)", alt)
+		case "video":
+			return "<video>"
 		case "a":
 			var href, id string
 			for _, attr := range n.Attr {
@@ -160,11 +162,23 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 			return "---"
 		case "del":
 			return "~~" + strings.Join(content, "") + "~~"
+		case "nav":
+			items := []string{}
+			for _, c := range content {
+				s := strings.TrimSpace(c)
+				if s != "" {
+					items = append(items, "- "+s)
+				}
+			}
+			if len(items) == 0 {
+				return ""
+			}
+			return fmt.Sprintf("## Nav Bar\n\n%s", strings.Join(items, "\n"))
 		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small":
 			return strings.Join(content, "\n")
-		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center":
+		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center", "picture":
 			return strings.Join(content, "")
-		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image":
+		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image", "polygon", "source", "use":
 			return ""
 		default:
 			log.Printf("Found unknown element: %v\n", n.Data)
@@ -196,7 +210,7 @@ func shouldVisit(n *html.Node) bool {
 	if n.Type != html.ElementNode {
 		return true
 	}
-	if n.Data == "input" {
+	if n.Data == "input" || n.Data == "textarea" {
 		for _, attr := range n.Attr {
 			if attr.Key == "type" && attr.Val == "hidden" {
 				return false
