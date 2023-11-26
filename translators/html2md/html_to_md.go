@@ -2,6 +2,7 @@ package html2md
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strings"
@@ -159,14 +160,14 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 			return "---"
 		case "del":
 			return "~~" + strings.Join(content, "") + "~~"
-		case "div", "section", "body", "header", "form", "dialog", "ul", "ol":
+		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small":
 			return strings.Join(content, "\n")
 		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center":
 			return strings.Join(content, "")
 		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image":
 			return ""
 		default:
-			fmt.Printf("Unknown element: %v\n", n.Data)
+			log.Printf("Found unknown element: %v\n", n.Data)
 			return strings.Join(content, "\n")
 		}
 	case html.CommentNode, html.DoctypeNode:
