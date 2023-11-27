@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"strings"
 	"webbot/translators"
-	"webbot/utils/slicesx"
-	"webbot/utils/stringsx"
 
 	"golang.org/x/net/html"
 )
@@ -22,6 +19,15 @@ type HTML2MDTranslator struct {
 type Options struct {
 	maxListDisplaySize int
 }
+
+type SelectableType string
+
+const (
+	SelectableTypeButton SelectableType = "button"
+	SelectableTypeLink   SelectableType = "link"
+	SelectableTypeInput  SelectableType = "input"
+	SelectableTypeTextA  SelectableType = "textarea"
+)
 
 func NewHTML2MDTranslator(options *Options) translators.Translator {
 	maxListDisplaySize := DefaultMaxListDisplaySize
@@ -45,14 +51,8 @@ func (t *HTML2MDTranslator) Translate(text string) (string, error) {
 	return cleanup(mdText), nil
 }
 
-func (t *HTML2MDTranslator) parseInnerText(childTexts []string) string {
-	s := strings.Join(childTexts, "")
-	re := regexp.MustCompile(`[^a-zA-Z0-9\\s]+`)
-	return re.ReplaceAllString(s, "")
-}
-
 func (t *HTML2MDTranslator) Visit(n *html.Node) string {
-	if !shouldVisit(n) {
+	if !shouldVisitNode(n) {
 		return ""
 	}
 	switch n.Type {
@@ -60,47 +60,27 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		return n.Data
 	case html.ElementNode:
 		content := t.visitChildren(n)
+		attrMap := buildAttrMapFromNode(n)
 		switch n.Data {
 		case "button":
-			innerText := t.parseInnerText(content)
-			var id string
-			for _, attr := range n.Attr {
-				if attr.Key == "data-vid" {
-					id = attr.Val
-				}
+			innerText := parseInnerText(content)
+			virtualID, ok := attrMap["data-vid"]
+			if !ok {
+				return strings.Join(content, "\n")
 			}
-			if innerText == "" || id == "" {
+			if innerText == "" {
 				return ""
 			}
-			return fmt.Sprintf("[%s](%s)", innerText, id)
+			return renderSelectable(SelectableTypeButton, virtualID, innerText, "")
 		case "input", "textarea":
-			var typ, name, ariaLabel, id string
-			for _, attr := range n.Attr {
-				switch attr.Key {
-				case "type":
-					typ = attr.Val
-				case "name":
-					name = attr.Val
-				case "aria-label":
-					ariaLabel = attr.Val
-				case "data-vid":
-					id = attr.Val
-				default:
-				}
-			}
-			if typ == "hidden" || id == "" {
-				return ""
-			} else if typ == "submit" {
-				return fmt.Sprintf("[%s](%s)", name, id)
+			if virtualID, ok := attrMap["data-vid"]; !ok {
+				return strings.Join(content, "\n")
+			} else if !isInputable(n, attrMap) {
+				return strings.Join(content, "\n")
+			} else if label, isInputable := getLabelForInputable(n, attrMap); !isInputable {
+				return strings.Join(content, "\n")
 			} else {
-				text := name
-				if text == "" {
-					text = ariaLabel
-				}
-				if strings.TrimSpace(text) == "" {
-					return fmt.Sprintf("[type=%s](%s)", typ, id)
-				}
-				return fmt.Sprintf("[%s, type=%s](%s)", text, typ, id)
+				return renderSelectable(SelectableType(n.Data), virtualID, label, "")
 			}
 		case "b", "strong":
 			return "**" + strings.Join(content, "") + "**"
@@ -121,32 +101,27 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		case "title":
 			return "# " + strings.Join(content, "")
 		case "img":
-			var alt string
-			for _, attr := range n.Attr {
-				if attr.Key == "alt" {
-					alt = attr.Val
-				}
-			}
-			if strings.TrimSpace(alt) == "" {
+			if alt, ok := attrMap["alt"]; !ok || strings.TrimSpace(alt) == "" {
 				return ""
+			} else {
+				return fmt.Sprintf("![%s](<img>)", alt)
 			}
-			return fmt.Sprintf("![%s](<img>)", alt)
 		case "video":
 			return "<video>"
 		case "a":
-			var href, id string
-			for _, attr := range n.Attr {
-				if attr.Key == "href" {
-					href = attr.Val
-				} else if attr.Key == "data-vid" {
-					id = attr.Val
+			if virtualID, ok := attrMap["data-vid"]; !ok {
+				return strings.Join(content, "\n")
+			} else if !isClickable(n, attrMap) {
+				return strings.Join(content, "\n")
+			} else {
+				innerText := parseInnerText(content)
+				href, ok := attrMap["href"]
+				if !ok {
+					return strings.Join(content, "\n")
 				}
+				strippedQueryParams := stripQueryParamsFromPossibleFullURL(href)
+				return renderSelectable(SelectableTypeLink, virtualID, innerText, fmt.Sprintf("href=\"%s\"", strippedQueryParams))
 			}
-			innerText := t.parseInnerText(content)
-			if strings.TrimSpace(href) == "" || innerText == "" || id == "" {
-				return ""
-			}
-			return fmt.Sprintf("[%s, href=%s](%s)", strings.TrimSpace(strings.Join(content, "")), href, id)
 		case "li":
 			text := strings.Join(content, "")
 			if strings.TrimSpace(text) == "" {
@@ -191,7 +166,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		content := t.visitChildren(n)
 		return strings.Join(content, "\n")
 	default:
-		fmt.Printf("Unknown node type: %v\n", n.Data)
+		log.Printf("Unknown html node type: %v\n", n.Data)
 		return ""
 	}
 }
@@ -202,51 +177,4 @@ func (t *HTML2MDTranslator) visitChildren(n *html.Node) []string {
 		content = append(content, t.Visit(c))
 	}
 	return content
-}
-
-func shouldVisit(n *html.Node) bool {
-	if n == nil {
-		return false
-	}
-	if n.Type != html.ElementNode {
-		return true
-	}
-	if n.Data == "input" || n.Data == "textarea" {
-		for _, attr := range n.Attr {
-			if attr.Key == "type" && attr.Val == "hidden" {
-				return false
-			}
-		}
-	}
-	for _, attr := range n.Attr {
-		if attr.Key == "aria-hidden" && attr.Val == "true" {
-			return false
-		}
-		if attr.Key == "style" {
-			hiddenStyles := []string{"opacity: 0", "font-size: 0", "width: 0", "height: 0", "display: none", "visibility: hidden"}
-			for _, style := range hiddenStyles {
-				if strings.Contains(attr.Val, style) {
-					return false
-				}
-			}
-		}
-	}
-	return true
-}
-
-func cleanup(mdText string) string {
-	// remove extra newlines
-	s := stringsx.ReduceNewlines(mdText, 2)
-
-	// remove extra spaces
-	s = strings.ReplaceAll(s, "  ", " ")
-
-	// remove trailing spaces for each line
-	lines := strings.Split(s, "\n")
-	s = strings.Join(slicesx.Map(lines, func(str string) string {
-		return strings.TrimSpace(str)
-	}), "\n")
-
-	// remove leading or trailing spaces
-	return strings.TrimSpace(s)
 }
