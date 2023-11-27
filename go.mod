@@ -1,4 +1,4 @@
-module webbot
+module collaborativebrowser
 
 go 1.21.0
 

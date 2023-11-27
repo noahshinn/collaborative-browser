@@ -1,9 +1,9 @@
 package afforderstrategy
 
 import (
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/trajectory"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 )
 
 type AfforderStrategy interface {

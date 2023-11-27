@@ -1,12 +1,12 @@
 package reflexion
 
 import (
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 	"context"
 	"fmt"
-	"webbot/actor/actorstrategy"
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/trajectory"
 )
 
 type ReflexionActor struct {

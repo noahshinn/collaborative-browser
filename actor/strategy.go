@@ -1,14 +1,14 @@
 package actor
 
 import (
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/actor/actorstrategy/basellm"
+	"collaborativebrowser/actor/actorstrategy/react"
+	"collaborativebrowser/actor/actorstrategy/reflexion"
+	"collaborativebrowser/actor/actorstrategy/verification"
+	"collaborativebrowser/llm"
 	"fmt"
 	"log"
-	"webbot/actor/actorstrategy"
-	"webbot/actor/actorstrategy/basellm"
-	"webbot/actor/actorstrategy/react"
-	"webbot/actor/actorstrategy/reflexion"
-	"webbot/actor/actorstrategy/verification"
-	"webbot/llm"
 )
 
 type ActorStrategyID string

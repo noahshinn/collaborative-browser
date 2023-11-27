@@ -1,8 +1,8 @@
 package trajectory
 
 import (
+	"collaborativebrowser/browser/virtualid"
 	"fmt"
-	"webbot/browser/virtualid"
 )
 
 type BrowserAction struct {

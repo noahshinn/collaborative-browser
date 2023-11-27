@@ -1,8 +1,7 @@
-# Webbot
+# Collaborative Browser
 
-## To run
+## To run the shell
 
 ```
-go run ./cmd/run/run.go
+go run ./cmd/shell/shell.go -url scholar.google.com
 ```
-

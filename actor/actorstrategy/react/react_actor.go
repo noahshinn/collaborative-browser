@@ -1,11 +1,11 @@
 package react
 
 import (
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 	"context"
-	"webbot/actor/actorstrategy"
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/trajectory"
 )
 
 type ReactActor struct {

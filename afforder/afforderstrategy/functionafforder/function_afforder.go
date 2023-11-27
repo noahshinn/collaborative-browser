@@ -1,16 +1,16 @@
 package functionafforder
 
 import (
+	"collaborativebrowser/afforder/afforderstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/browser/language"
+	"collaborativebrowser/browser/virtualid"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"webbot/afforder/afforderstrategy"
-	"webbot/browser"
-	"webbot/browser/language"
-	"webbot/browser/virtualid"
-	"webbot/llm"
-	"webbot/trajectory"
 )
 
 type FunctionAfforder struct {

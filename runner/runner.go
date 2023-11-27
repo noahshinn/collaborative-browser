@@ -1,9 +1,9 @@
 package runner
 
 import (
-	"webbot/actor/actorstrategy"
-	"webbot/browser"
-	"webbot/trajectory"
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/trajectory"
 )
 
 type Runner interface {

@@ -2,15 +2,15 @@ package main
 
 import (
 	"bufio"
+	"collaborativebrowser/actor"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/runner/finiterunner"
+	"collaborativebrowser/trajectory"
 	"context"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
-	"webbot/actor"
-	"webbot/browser"
-	"webbot/runner/finiterunner"
-	"webbot/trajectory"
 )
 
 func main() {

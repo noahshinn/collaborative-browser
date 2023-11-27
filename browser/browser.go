@@ -1,16 +1,16 @@
 package browser
 
 import (
+	"collaborativebrowser/browser/language"
+	"collaborativebrowser/browser/virtualid"
+	"collaborativebrowser/trajectory"
+	"collaborativebrowser/translators"
+	"collaborativebrowser/translators/html2md"
 	"context"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
-	"webbot/browser/language"
-	"webbot/browser/virtualid"
-	"webbot/trajectory"
-	"webbot/translators"
-	"webbot/translators/html2md"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"

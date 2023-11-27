@@ -1,11 +1,11 @@
 package html2md
 
 import (
+	"collaborativebrowser/translators"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-	"webbot/translators"
 
 	"golang.org/x/net/html"
 )

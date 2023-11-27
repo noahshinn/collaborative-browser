@@ -1,13 +1,13 @@
 package html2md
 
 import (
+	"collaborativebrowser/utils/slicesx"
+	"collaborativebrowser/utils/stringsx"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-	"webbot/utils/slicesx"
-	"webbot/utils/stringsx"
 
 	"golang.org/x/net/html"
 )

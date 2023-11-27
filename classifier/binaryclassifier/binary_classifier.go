@@ -1,10 +1,10 @@
 package binaryclassifier
 
 import (
+	"collaborativebrowser/llm"
 	"context"
 	"encoding/json"
 	"fmt"
-	"webbot/llm"
 )
 
 type BinaryClassifier interface {

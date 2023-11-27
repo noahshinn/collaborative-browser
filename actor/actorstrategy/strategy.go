@@ -1,9 +1,9 @@
 package actorstrategy
 
 import (
+	"collaborativebrowser/browser"
+	"collaborativebrowser/trajectory"
 	"context"
-	"webbot/browser"
-	"webbot/trajectory"
 )
 
 type ActorStrategy interface {

@@ -1,9 +1,9 @@
 package afforder
 
 import (
+	"collaborativebrowser/afforder/afforderstrategy"
+	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
 	"fmt"
-	"webbot/afforder/afforderstrategy"
-	"webbot/afforder/afforderstrategy/functionafforder"
 )
 
 type AfforderStrategyID string

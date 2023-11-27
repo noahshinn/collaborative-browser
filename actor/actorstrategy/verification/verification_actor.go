@@ -1,14 +1,14 @@
 package verification
 
 import (
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"webbot/actor/actorstrategy"
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/trajectory"
 )
 
 type VerificationActor struct {

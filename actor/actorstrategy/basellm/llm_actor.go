@@ -1,14 +1,14 @@
 package basellm
 
 import (
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/afforder/afforderstrategy"
+	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/trajectory"
 	"context"
 	"fmt"
-	"webbot/actor/actorstrategy"
-	"webbot/afforder/afforderstrategy"
-	"webbot/afforder/afforderstrategy/functionafforder"
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/trajectory"
 )
 
 type BaseLLMActor struct {

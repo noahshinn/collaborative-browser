@@ -1,18 +1,18 @@
 package finiterunner
 
 import (
+	"collaborativebrowser/actor"
+	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/browser"
+	"collaborativebrowser/llm"
+	"collaborativebrowser/runner"
+	"collaborativebrowser/trajectory"
+	"collaborativebrowser/utils/io"
 	"context"
 	"fmt"
 	"os"
 	"path"
 	"strings"
-	"webbot/actor"
-	"webbot/actor/actorstrategy"
-	"webbot/browser"
-	"webbot/llm"
-	"webbot/runner"
-	"webbot/trajectory"
-	"webbot/utils/io"
 
 	"github.com/yosssi/gohtml"
 )
