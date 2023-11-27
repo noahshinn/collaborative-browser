@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"webbot/actor"
 	"webbot/browser"
 	"webbot/runner/finiterunner"
 	"webbot/trajectory"
@@ -17,6 +18,7 @@ func main() {
 	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
 	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
+	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, react, verification, reflexion]")
 	flag.Parse()
 
 	browserOptions := []browser.BrowserOption{
@@ -33,10 +35,14 @@ func main() {
 	apiKeys := map[string]string{
 		"OPENAI_API_KEY": openaiAPIKey,
 	}
+	if *actorStrategy == "" {
+		*actorStrategy = string(actor.DefaultActorStrategyID)
+	}
 	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, *initialURL, apiKeys, &finiterunner.Options{
-		MaxNumSteps:    5,
-		BrowserOptions: browserOptions,
-		LogPath:        *logPath,
+		MaxNumSteps:     5,
+		BrowserOptions:  browserOptions,
+		LogPath:         *logPath,
+		ActorStrategyID: actor.ActorStrategyID(*actorStrategy),
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))

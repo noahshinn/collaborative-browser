@@ -6,8 +6,8 @@ import (
 	"os"
 	"path"
 	"strings"
-	"webbot/afforder"
-	"webbot/afforder/functionafforder"
+	"webbot/actor"
+	"webbot/actor/actorstrategy"
 	"webbot/browser"
 	"webbot/llm"
 	"webbot/runner"
@@ -19,7 +19,7 @@ import (
 
 type FiniteRunner struct {
 	ctx         context.Context
-	afforder    afforder.Afforder
+	actor       actorstrategy.ActorStrategy
 	browser     *browser.Browser
 	maxNumSteps int
 	trajectory  *trajectory.Trajectory
@@ -29,9 +29,12 @@ type FiniteRunner struct {
 const DefaultMaxNumSteps = 5
 
 type Options struct {
-	MaxNumSteps    int
-	BrowserOptions []browser.BrowserOption
-	LogPath        string
+	MaxNumSteps     int
+	BrowserOptions  []browser.BrowserOption
+	LogPath         string
+	ActorStrategyID actor.ActorStrategyID
+
+	BaseActorStrategyID actor.ActorStrategyID
 }
 
 const DefaultLogPath = "log"
@@ -40,6 +43,8 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	maxNumSteps := DefaultMaxNumSteps
 	logPath := DefaultLogPath
 	browserOptions := []browser.BrowserOption{}
+	actorStrategyID := actor.DefaultActorStrategyID
+	baseActorStrategy := actor.DefaultActorStrategyID
 	if options != nil {
 		if options.MaxNumSteps > 0 {
 			maxNumSteps = options.MaxNumSteps
@@ -50,6 +55,12 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 		if options.BrowserOptions != nil {
 			browserOptions = options.BrowserOptions
 		}
+		if options.ActorStrategyID != "" {
+			actorStrategyID = options.ActorStrategyID
+		}
+		if options.BaseActorStrategyID != "" {
+			baseActorStrategy = options.BaseActorStrategyID
+		}
 	}
 	if apiKeys == nil {
 		return nil, fmt.Errorf("api keys must be provided")
@@ -58,7 +69,12 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	} else {
 		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
-		afforder := functionafforder.NewFunctionAfforder(allModels.DefaultChatModel)
+		actor, err := actor.ActorStrategyByIDWithOptions(actorStrategyID, allModels, &actor.Options{
+			BaseActorStrategyID: baseActorStrategy,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize actor: %w", err)
+		}
 		browser := browser.NewBrowser(ctx, browserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
 		observation, err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction))
@@ -73,9 +89,10 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 				initialObservation,
 			},
 		}
+		fmt.Printf("Initializing a finite runner with the following configuration:\n    max num steps: %d\n    actor strategy: %s\n    log path: %s", maxNumSteps, actorStrategyID, logPath)
 		return &FiniteRunner{
 			ctx:         ctx,
-			afforder:    afforder,
+			actor:       actor,
 			browser:     browser,
 			maxNumSteps: maxNumSteps,
 			trajectory:  trajectory,
@@ -84,33 +101,9 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	}
 }
 
-func NewFiniteRunnerFromInitialPageAndRequest(ctx context.Context, url string, request string, apiKeys map[string]string, options *Options) (runner.Runner, error) {
-	runner, err := NewFiniteRunnerFromInitialPage(ctx, url, apiKeys, options)
-	if err != nil {
-		return nil, err
-	}
-	message := trajectory.NewUserMessage(request)
-	runner.Trajectory().AddItem(message)
-	nextAction, debugMessageDisplay, err := runner.Afforder().NextAction(ctx, runner.Trajectory(), runner.Browser())
-	if err != nil {
-		return nil, fmt.Errorf("page visit was successful but the actor failed to perform the initial action: %w", err)
-	}
-	runner.Trajectory().AddItem(debugMessageDisplay)
-	runner.Trajectory().AddItem(nextAction)
-	if nextAction.ShouldHandoff() {
-		return runner, nil
-	} else if observation, err := runner.Browser().AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
-		return nil, fmt.Errorf("page visit was successful but the browser failed to accept the initial action: %w", err)
-	} else {
-		runner.Trajectory().AddItem(trajectory.NewBrowserObservation(observation))
-		return runner, nil
-	}
-}
-
 func (r *FiniteRunner) Run() error {
 	for i := 0; i < r.maxNumSteps; i++ {
-		nextAction, debugDisplays, err := r.runStep()
-		r.trajectory.AddItems(debugDisplays)
+		nextAction, err := r.runStep()
 		if err != nil {
 			return err
 		}
@@ -130,12 +123,8 @@ func (r *FiniteRunner) Run() error {
 	return nil
 }
 
-func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, debugDisplays []trajectory.TrajectoryItem, err error) {
-	nextAction, debugMessageDisplay, err := r.afforder.NextAction(r.ctx, r.trajectory, r.browser)
-	if debugMessageDisplay == nil {
-		return nextAction, []trajectory.TrajectoryItem{}, err
-	}
-	return nextAction, []trajectory.TrajectoryItem{debugMessageDisplay}, err
+func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, err error) {
+	return r.actor.NextAction(r.ctx, r.trajectory, r.browser)
 }
 
 func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error) {
@@ -154,15 +143,10 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 	go func() {
 		defer close(stream)
 		for i := 0; i < r.maxNumSteps; i++ {
-			nextAction, debugDisplays, err := r.runStep()
+			nextAction, err := r.runStep()
 			if err != nil {
 				sendErrorTrajectoryItem(err)
 				return
-			}
-			for _, debugDisplay := range debugDisplays {
-				if debugDisplay != nil {
-					addAndSendTrajectoryItem(debugDisplay)
-				}
 			}
 			addAndSendTrajectoryItem(nextAction)
 			if nextAction.ShouldHandoff() {
@@ -186,8 +170,8 @@ func (r *FiniteRunner) Trajectory() *trajectory.Trajectory {
 	return r.trajectory
 }
 
-func (r *FiniteRunner) Afforder() afforder.Afforder {
-	return r.afforder
+func (r *FiniteRunner) Actor() actorstrategy.ActorStrategy {
+	return r.actor
 }
 
 func (r *FiniteRunner) Browser() *browser.Browser {

@@ -1,12 +1,11 @@
 package functionafforder
 
 import (
-	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"webbot/afforder"
+	"webbot/afforder/afforderstrategy"
 	"webbot/browser"
 	"webbot/browser/language"
 	"webbot/browser/virtualid"
@@ -15,15 +14,14 @@ import (
 )
 
 type FunctionAfforder struct {
-	ChatModel            llm.ChatModel
-	SystemPrompt         string
-	PermissibleFunctions []*llm.FunctionDef
+	permissibleFunctions   []*llm.FunctionDef
+	permissibleFunctionMap map[string]*llm.FunctionDef
 }
 
 //go:embed system_prompt_to_act_on_browser.txt
 var systemPromptToActOnBrowser string
 
-func NewFunctionAfforder(chatModel llm.ChatModel) afforder.Afforder {
+func New() afforderstrategy.AfforderStrategy {
 	permissibleFunctions := []*llm.FunctionDef{
 		{
 			Name: "click",
@@ -95,24 +93,17 @@ func NewFunctionAfforder(chatModel llm.ChatModel) afforder.Afforder {
 			},
 		},
 	}
-	return &FunctionAfforder{
-		ChatModel:            chatModel,
-		SystemPrompt:         systemPromptToActOnBrowser,
-		PermissibleFunctions: permissibleFunctions,
-	}
-}
-
-func (a *FunctionAfforder) permissibleFunctionMap() map[string]*llm.FunctionDef {
 	m := make(map[string]*llm.FunctionDef)
-	for _, functionDef := range a.PermissibleFunctions {
+	for _, functionDef := range permissibleFunctions {
 		m[functionDef.Name] = functionDef
 	}
-	return m
+	return &FunctionAfforder{
+		permissibleFunctions:   permissibleFunctions,
+		permissibleFunctionMap: m,
+	}
 }
 
-const maxTokenContextWindowMarginProportion float32 = 0.1
-
-func (a *FunctionAfforder) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (nextAction trajectory.TrajectoryItem, render trajectory.TrajectoryItem, err error) {
+func (a *FunctionAfforder) GetAffordances(traj *trajectory.Trajectory, br *browser.Browser) ([]*llm.Message, []*llm.FunctionDef, error) {
 	pageRender, err := br.Render(language.LanguageMD)
 	if err != nil {
 		return nil, nil, fmt.Errorf("browser failed to render page: %w", err)
@@ -128,63 +119,19 @@ func (a *FunctionAfforder) NextAction(ctx context.Context, traj *trajectory.Traj
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,
-			Content: a.SystemPrompt,
+			Content: systemPromptToActOnBrowser,
 		},
 		{
 			Role:    llm.MessageRoleUser,
 			Content: fmt.Sprintf("%s\n\nLook at the Trajectory to inform your next action.", strings.TrimSpace(state)),
 		},
 	}
-	var messageDebugDisplayItem trajectory.TrajectoryItem
-	if messageDebugDisplay, err := a.renderDebugDisplay(messages, a.PermissibleFunctions); err != nil {
-		messageDebugDisplayItem = trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeLLMMesages, fmt.Sprintf("error rendering message debug display: %s", err))
-	} else {
-		messageDebugDisplayItem = trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeLLMMesages, messageDebugDisplay)
-	}
-	approxNumTokens := llm.ApproxNumTokensInMessages(messages) + llm.ApproxNumTokensInFunctionDefs(a.PermissibleFunctions)
-	if approxNumTokens > int(float32(a.ChatModel.ContextLength())*(1-maxTokenContextWindowMarginProportion)) {
-		return trajectory.NewErrorMaxContextLengthExceeded(a.ChatModel.ContextLength(), approxNumTokens), messageDebugDisplayItem, nil
-	}
-	if res, err := a.ChatModel.Message(ctx, messages, &llm.MessageOptions{
-		Temperature: 0.0,
-		Functions:   a.PermissibleFunctions,
-	}); err != nil {
-		return nil, nil, fmt.Errorf("failed to generate message: %w", err)
-	} else if res.FunctionCall == nil {
-		return trajectory.NewAgentMessage(res.Content), messageDebugDisplayItem, nil
-	} else if _, ok := a.permissibleFunctionMap()[res.FunctionCall.Name]; !ok {
-		return nil, nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
-	} else if nextAction, err := a.parseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse next action: %w", err)
-	} else {
-		return nextAction, messageDebugDisplayItem, nil
-	}
+	return messages, a.permissibleFunctions, nil
 }
 
-func (a *FunctionAfforder) renderDebugDisplay(messages []*llm.Message, functionDefs []*llm.FunctionDef) (string, error) {
-	messageTexts := make([]string, len(messages))
-	for i, message := range messages {
-		if message.Role == llm.MessageRoleFunction {
-			messageTexts[i] = fmt.Sprintf("%s(%s)", message.FunctionCall.Name, message.FunctionCall.Arguments)
-		} else {
-			messageTexts[i] = fmt.Sprintf("%s: %s", message.Role, message.Content)
-		}
-	}
-
-	functionDefTexts := make([]string, len(functionDefs))
-	for i, functionDef := range functionDefs {
-		b, err := json.Marshal(functionDef)
-		if err != nil {
-			return "", fmt.Errorf("error marshaling function def: %w", err)
-		}
-		functionDefTexts[i] = string(b)
-	}
-	return fmt.Sprintf("%s\n\n%s", strings.Join(messageTexts, "\n"), strings.Join(functionDefTexts, "\n")), nil
-}
-
-func (a *FunctionAfforder) parseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
+func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
 	var args map[string]any
-	functions := a.permissibleFunctionMap()
+	functions := a.permissibleFunctionMap
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		if name == "message" && len(arguments) > 0 {
 			return trajectory.NewAgentMessage(arguments), nil
@@ -218,4 +165,9 @@ func (a *FunctionAfforder) parseNextAction(name string, arguments string) (traje
 	default:
 		return nil, fmt.Errorf("unsupported action was attempted: %s", name)
 	}
+}
+
+func (a *FunctionAfforder) DoesActionExist(name string) bool {
+	_, ok := a.permissibleFunctionMap[name]
+	return ok
 }

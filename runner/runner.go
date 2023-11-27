@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"webbot/afforder"
+	"webbot/actor/actorstrategy"
 	"webbot/browser"
 	"webbot/trajectory"
 )
@@ -9,7 +9,7 @@ import (
 type Runner interface {
 	Run() error
 	RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error)
-	Afforder() afforder.Afforder
+	Actor() actorstrategy.ActorStrategy
 	Trajectory() *trajectory.Trajectory
 	Browser() *browser.Browser
 	Log() error

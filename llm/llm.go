@@ -26,8 +26,8 @@ type Models struct {
 	EmbeddingModels             map[EmbeddingModelID]EmbeddingModel
 }
 
-func AllModels(api_key string) Models {
-	return Models{
+func AllModels(api_key string) *Models {
+	return &Models{
 		DefaultChatModel:            NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
 		DefaultLongContextChatModel: NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
 		DefaultLightChatModel:       NewOpenAIChatModel(ChatModelGPT4Turbo, api_key),
