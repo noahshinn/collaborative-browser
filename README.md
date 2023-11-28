@@ -15,9 +15,10 @@ go run ./cmd/shell/shell.go -url scholar.google.com -headful
 ```
 
 Built-in commands:
-    - `help`: prints some usage instructions
-    - `log`: logs the current browser and trajectory to the specified log path
-    - `exit`: gracefully exits the shell
+
+- `help`: prints some usage instructions
+- `log`: logs the current browser and trajectory to the specified log path
+- `exit`: gracefully exits the shell
 
 ## Markdown Browser
 
