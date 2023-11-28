@@ -11,7 +11,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 )
 
 func main() {
@@ -57,35 +56,45 @@ func main() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("user: ")
+ScannerLoop:
 	for scanner.Scan() {
 		userMessageText := scanner.Text()
-		if len(userMessageText) == 0 {
+		switch userMessageText {
+		case "":
 			fmt.Print("user: ")
-			continue
-		} else if userMessageText == "exit" {
+			continue ScannerLoop
+		case "exit":
 			fmt.Println("\nexiting...")
-			break
-		} else {
-			userMessageText = strings.TrimSpace(userMessageText)
-		}
-		runner.Trajectory().AddItem(trajectory.NewMessage(trajectory.MessageAuthorUser, userMessageText))
-		stream, err := runner.RunAndStream()
-		if err != nil {
-			panic(fmt.Errorf("failed to run and stream: %w", err))
-		}
-		for event := range stream {
-			if event.Error != nil {
-				panic(fmt.Errorf("error in stream: %w", event.Error))
-			}
-			if event.TrajectoryItem.ShouldRender() {
-				if _, ok := event.TrajectoryItem.(*trajectory.Message); ok {
-					fmt.Println(event.TrajectoryItem.GetText())
-				} else {
-					fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
-				}
-			}
+			break ScannerLoop
+		case "log":
 			runner.Log()
+			printx.PrintInColor(printx.ColorGray, "Logged the current state to "+*logPath+".")
+			fmt.Print("user: ")
+			continue ScannerLoop
+		case "help":
+			printx.PrintInColor(printx.ColorGray, "This interface is simple - just type natural language. For example, to navigate to google, type \"go to google.com\".\nTo log the current state, type \"log\".\nTo exit gracefully, type \"exit\".")
+			fmt.Print("user: ")
+			continue ScannerLoop
+		default:
+			runner.Trajectory().AddItem(trajectory.NewMessage(trajectory.MessageAuthorUser, userMessageText))
+			stream, err := runner.RunAndStream()
+			if err != nil {
+				panic(fmt.Errorf("failed to run and stream: %w", err))
+			}
+			for event := range stream {
+				if event.Error != nil {
+					panic(fmt.Errorf("error in stream: %w", event.Error))
+				}
+				if event.TrajectoryItem.ShouldRender() {
+					if _, ok := event.TrajectoryItem.(*trajectory.Message); ok {
+						fmt.Println(event.TrajectoryItem.GetText())
+					} else {
+						fmt.Println(event.TrajectoryItem.GetAbbreviatedText())
+					}
+				}
+				runner.Log()
+			}
+			fmt.Print("user: ")
 		}
-		fmt.Print("user: ")
 	}
 }

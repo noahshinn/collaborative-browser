@@ -14,7 +14,10 @@ This will start the shell with the starting location at [https://scholar.google.
 go run ./cmd/shell/shell.go -url scholar.google.com -headful
 ```
 
-Use the `exit` command to gracefully exit the shell.
+Built-in commands:
+    - `help`: prints some usage instructions
+    - `log`: logs the current browser and trajectory to the specified log path
+    - `exit`: gracefully exits the shell
 
 ## Markdown Browser
 

@@ -14,7 +14,7 @@ import (
 type ActorStrategyID string
 
 const (
-	ActorStrategyIDBaseLLM      ActorStrategyID = "base_llm"
+	ActorStrategyIDBaseLLM      ActorStrategyID = "base"
 	ActorStrategyIDReact        ActorStrategyID = "react"
 	ActorStrategyIDVerification ActorStrategyID = "verification"
 	ActorStrategyIDReflexion    ActorStrategyID = "reflexion"

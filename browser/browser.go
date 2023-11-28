@@ -57,6 +57,9 @@ func (b *Browser) updateDisplay() error {
 	} else {
 		b.display.HTML = html
 		b.display.Location = location
+		if b.display.MD == "" {
+			b.display.MD = "No MD display available yet."
+		}
 		return nil
 	}
 }
