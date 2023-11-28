@@ -7,25 +7,21 @@ type Message struct {
 	Handoff
 	Author MessageAuthor
 	Text   string
+
+	ItemIsMessage
 }
 
 type MessageAuthor string
 
 const (
-	MessageAuthorUser  MessageAuthor = "user"
-	MessageAuthorAgent MessageAuthor = "agent"
+	MessageAuthorUser             MessageAuthor = "user"
+	MessageAuthorAgent            MessageAuthor = "agent"
+	MessageAuthorInternalFeedback MessageAuthor = "internal_feedback"
 )
 
-func NewUserMessage(text string) TrajectoryItem {
+func NewMessage(author MessageAuthor, text string) TrajectoryItem {
 	return &Message{
-		Author: MessageAuthorUser,
-		Text:   text,
-	}
-}
-
-func NewAgentMessage(text string) TrajectoryItem {
-	return &Message{
-		Author: MessageAuthorAgent,
+		Author: author,
 		Text:   text,
 	}
 }

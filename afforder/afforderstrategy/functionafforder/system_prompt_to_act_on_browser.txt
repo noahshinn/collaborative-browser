@@ -28,7 +28,6 @@ Messages are displayed as authored by either `agent` or `user`. You can only sen
 _Note: messages should be sent via the `message` action. Plain text messages are deprecated._
 
 ## Example Display
-
 ----- START BROWSER -----
 <the browser content in markdown>
 ----- END BROWSER -----

@@ -8,6 +8,7 @@ import (
 	"collaborativebrowser/runner"
 	"collaborativebrowser/trajectory"
 	"collaborativebrowser/utils/io"
+	"collaborativebrowser/utils/printx"
 	"context"
 	"fmt"
 	"os"
@@ -67,7 +68,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	} else if openaiApiKey, ok := apiKeys["OPENAI_API_KEY"]; !ok {
 		return nil, fmt.Errorf("api keys must contain OPENAI_API_KEY") // for now
 	} else {
-		userMessage := trajectory.NewUserMessage(fmt.Sprintf("Please go to %s", url))
+		userMessage := trajectory.NewMessage(trajectory.MessageAuthorUser, fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
 		actor, err := actor.ActorStrategyByIDWithOptions(actorStrategyID, allModels, &actor.Options{
 			BaseActorStrategyID: baseActorStrategy,
@@ -89,7 +90,8 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 				initialObservation,
 			},
 		}
-		fmt.Printf("Initializing a finite runner with the following configuration:\n    max num steps: %d\n    actor strategy: %s\n    log path: %s", maxNumSteps, actorStrategyID, logPath)
+		printx.PrintStandardHeader("CONFIGURATION")
+		fmt.Printf("\nInitializing a finite runner with the following configuration:\n    max num steps per turn: %d\n    actor strategy: %s\n    log path: %s\n", maxNumSteps, actorStrategyID, logPath)
 		return &FiniteRunner{
 			ctx:         ctx,
 			actor:       actor,

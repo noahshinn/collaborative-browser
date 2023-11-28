@@ -35,7 +35,7 @@ func (a *BaseLLMActor) NextAction(ctx context.Context, traj *trajectory.Trajecto
 	}); err != nil {
 		return nil, fmt.Errorf("failed to generate message: %w", err)
 	} else if res.FunctionCall == nil {
-		return trajectory.NewAgentMessage(res.Content), nil
+		return trajectory.NewMessage(trajectory.MessageAuthorAgent, res.Content), nil
 	} else if exists := a.afforder.DoesActionExist(res.FunctionCall.Name); !exists {
 		return nil, fmt.Errorf("unsupported action was attempted: %s", res.FunctionCall.Name)
 	} else if nextAction, err := a.afforder.ParseNextAction(res.FunctionCall.Name, res.FunctionCall.Arguments); err != nil {

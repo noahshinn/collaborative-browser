@@ -6,6 +6,7 @@ import (
 	"collaborativebrowser/browser"
 	"collaborativebrowser/runner/finiterunner"
 	"collaborativebrowser/trajectory"
+	"collaborativebrowser/utils/printx"
 	"context"
 	"flag"
 	"fmt"
@@ -18,7 +19,7 @@ func main() {
 	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
 	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
-	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, react, verification, reflexion]")
+	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, reflexion]")
 	flag.Parse()
 
 	browserOptions := []browser.BrowserOption{
@@ -48,7 +49,8 @@ func main() {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
 	runner.Log()
-	fmt.Println("\n" + strings.Repeat("-", 80) + "\nTRAJECTORY\n" + strings.Repeat("-", 80) + "\n")
+	printx.PrintStandardHeader("TRAJECTORY")
+	fmt.Println()
 	for _, item := range runner.Trajectory().Items {
 		fmt.Println(item.GetAbbreviatedText())
 	}
@@ -66,7 +68,7 @@ func main() {
 		} else {
 			userMessageText = strings.TrimSpace(userMessageText)
 		}
-		runner.Trajectory().AddItem(trajectory.NewUserMessage(userMessageText))
+		runner.Trajectory().AddItem(trajectory.NewMessage(trajectory.MessageAuthorUser, userMessageText))
 		stream, err := runner.RunAndStream()
 		if err != nil {
 			panic(fmt.Errorf("failed to run and stream: %w", err))

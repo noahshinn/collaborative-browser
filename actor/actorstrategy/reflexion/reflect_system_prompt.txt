@@ -1,0 +1,2 @@
+# Task
+You will be given a CONTEXT that was presented to a language model. A CONTEXT contains a set of rules, background information about the browser, goals, and task-specific information. The CONTEXT also contains the action space available at inference time and the chosen action. Your task is to read the CONTEXT, consider the action space and action choice, and determine if the correct action choice was taken. First, provide a reason, then your classification.

@@ -18,6 +18,8 @@ type BrowserAction struct {
 
 	// for task_complete or task_not_possible
 	Reason string `json:"reason"`
+
+	ItemIsNotMessage
 }
 
 type BrowserActionType string
@@ -106,6 +108,7 @@ func (ba *BrowserAction) ShouldRender() bool {
 type BrowserObservation struct {
 	DontHandoff
 	Render
+	ItemIsNotMessage
 	Text            string
 	TextAbbreviated string
 }

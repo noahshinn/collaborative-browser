@@ -51,6 +51,7 @@ type TrajectoryItem interface {
 	GetText() string
 	ShouldHandoff() bool
 	ShouldRender() bool
+	IsMessage() bool
 }
 
 type TrajectoryStreamEvent struct {
@@ -62,6 +63,8 @@ type Handoff struct{}
 type DontHandoff struct{}
 type Render struct{}
 type DontRender struct{}
+type ItemIsMessage struct{}
+type ItemIsNotMessage struct{}
 
 func (h Handoff) ShouldHandoff() bool {
 	return true
@@ -76,5 +79,13 @@ func (r Render) ShouldRender() bool {
 }
 
 func (d DontRender) ShouldRender() bool {
+	return false
+}
+
+func (i ItemIsMessage) IsMessage() bool {
+	return true
+}
+
+func (i ItemIsNotMessage) IsMessage() bool {
 	return false
 }

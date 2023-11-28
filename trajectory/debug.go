@@ -11,6 +11,7 @@ const (
 type DebugRenderedDisplay struct {
 	DontHandoff
 	DontRender
+	ItemIsNotMessage
 
 	Type DebugDisplayType
 	Text string

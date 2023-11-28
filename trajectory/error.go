@@ -5,6 +5,7 @@ import "fmt"
 type errorItem struct {
 	Handoff
 	Render
+	ItemIsNotMessage
 }
 
 type ErrorMaxNumStepsReached struct {

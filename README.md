@@ -14,6 +14,8 @@ This will start the shell with the starting location at [https://scholar.google.
 go run ./cmd/shell/shell.go -url scholar.google.com -headful
 ```
 
+Use the `exit` command to gracefully exit the shell.
+
 ## Markdown Browser
 
 The Markdown Browser is an example of a text browser. It uses `virtual IDs` to enable textual users to select elements.

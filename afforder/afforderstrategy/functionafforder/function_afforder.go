@@ -134,7 +134,7 @@ func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (traje
 	functions := a.permissibleFunctionMap
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
 		if name == "message" && len(arguments) > 0 {
-			return trajectory.NewAgentMessage(arguments), nil
+			return trajectory.NewMessage(trajectory.MessageAuthorAgent, arguments), nil
 		}
 		return nil, fmt.Errorf("error unmarshaling function call arguments for function %s: %w, \"%s\"", name, err, arguments)
 	}
@@ -159,7 +159,7 @@ func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (traje
 	case "navigate":
 		return trajectory.NewBrowserNavigateAction(args["url"].(string)), nil
 	case "message":
-		return trajectory.NewAgentMessage(args["text"].(string)), nil
+		return trajectory.NewMessage(trajectory.MessageAuthorAgent, args["text"].(string)), nil
 	case "task_not_possible":
 		return trajectory.NewBrowserTaskNotPossibleAction(args["reason"].(string)), nil
 	default:
