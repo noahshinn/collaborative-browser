@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -90,7 +89,9 @@ func (m *OpenAIModel) buildArgs(messages []*Message, options *MessageOptions) ma
 		if options.FunctionCall == FunctionCallNone || options.FunctionCall == FunctionCallAuto {
 			args["function_call"] = options.FunctionCall
 		} else {
-			args["function_call"] = fmt.Sprintf("{\"name\":\\ \"%s\"}", options.FunctionCall)
+			args["function_call"] = map[string]string{
+				"name": options.FunctionCall,
+			}
 		}
 	}
 	return args
