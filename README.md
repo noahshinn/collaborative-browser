@@ -8,7 +8,11 @@ The Collaborative Browser is a shared interface for many users. This project enc
 go run ./cmd/shell/shell.go -url scholar.google.com
 ```
 
-This will start the shell with the starting location at [https://scholar.google.com/](https://scholar.google.com/)
+This will start the shell with the starting location at [https://scholar.google.com/](https://scholar.google.com/). To interact with the browser or to see the changes, visually, run:
+
+```bash
+go run ./cmd/shell/shell.go -url scholar.google.com -headful
+```
 
 ## Markdown Browser
 
