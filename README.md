@@ -1,6 +1,6 @@
 # Collaborative Browser
 
-The Collaborative Browser is a shared interface for many users. This project encourages development in AI to focus on building intuitive _environments_, not _users_, to do complex tasks.
+The Collaborative Browser is a shared interface for many users. This project focuses on the design of intuitive _environments_ that offer proper affordances, not smart _users_ with extensive planning and reflection modules to accomplish complex tasks.
 
 ## To run the shell
 
@@ -8,7 +8,7 @@ The Collaborative Browser is a shared interface for many users. This project enc
 go run ./cmd/shell/shell.go -url scholar.google.com
 ```
 
-This will start the shell with the starting location at [https://scholar.google.com/](https://scholar.google.com/). To interact with the browser or to see the changes, visually, run:
+This will start the shell with the starting location at [https://scholar.google.com/](https://scholar.google.com/). To interact with the browser or to see the changes visually, run:
 
 ```bash
 go run ./cmd/shell/shell.go -url scholar.google.com -headful
