@@ -13,4 +13,5 @@ type Runner interface {
 	Trajectory() *trajectory.Trajectory
 	Browser() *browser.Browser
 	Log() error
+	Terminate()
 }

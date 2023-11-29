@@ -65,6 +65,7 @@ ScannerLoop:
 			continue ScannerLoop
 		case "exit":
 			fmt.Println("\nexiting...")
+			runner.Terminate()
 			break ScannerLoop
 		case "log":
 			runner.Log()

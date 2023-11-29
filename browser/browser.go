@@ -210,6 +210,10 @@ func (b *Browser) GetDisplay() *BrowserDisplay {
 	return b.display
 }
 
+func (b *Browser) Cancel() {
+	b.cancel()
+}
+
 func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 	vIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	ops := chromedp.DefaultExecAllocatorOptions[:]

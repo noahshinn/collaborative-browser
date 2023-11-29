@@ -91,7 +91,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 			},
 		}
 		printx.PrintStandardHeader("CONFIGURATION")
-		fmt.Printf("\nInitializing a finite runner with the following configuration:\n    max num steps per turn: %d\n    actor strategy: %s\n    log path: %s\n", maxNumSteps, actorStrategyID, logPath)
+		fmt.Printf("\nInitializing a finite runner with the following configuration:\n- Maximum number steps per turn: %d\n- Actor strategy: %s\n- Log path: %s\n", maxNumSteps, actorStrategyID, logPath)
 		return &FiniteRunner{
 			ctx:         ctx,
 			actor:       actor,
@@ -200,4 +200,8 @@ func (r *FiniteRunner) Log() error {
 	} else {
 		return nil
 	}
+}
+
+func (r *FiniteRunner) Terminate() {
+	r.browser.Cancel()
 }
