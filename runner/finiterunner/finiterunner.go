@@ -3,6 +3,7 @@ package finiterunner
 import (
 	"collaborativebrowser/actor"
 	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/runner"
@@ -30,12 +31,11 @@ type FiniteRunner struct {
 const DefaultMaxNumSteps = 5
 
 type Options struct {
-	MaxNumSteps     int
-	BrowserOptions  []browser.BrowserOption
-	LogPath         string
-	ActorStrategyID actor.ActorStrategyID
-
-	BaseActorStrategyID actor.ActorStrategyID
+	MaxNumSteps        int
+	BrowserOptions     []browser.BrowserOption
+	LogPath            string
+	ActorStrategyID    actor.ActorStrategyID
+	AfforderStrategyID afforder.AfforderStrategyID
 }
 
 const DefaultLogPath = "log"
@@ -45,7 +45,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	logPath := DefaultLogPath
 	browserOptions := []browser.BrowserOption{}
 	actorStrategyID := actor.DefaultActorStrategyID
-	baseActorStrategy := actor.DefaultActorStrategyID
+	afforderStrategyID := afforder.DefaultAfforderStrategyID
 	if options != nil {
 		if options.MaxNumSteps > 0 {
 			maxNumSteps = options.MaxNumSteps
@@ -59,8 +59,8 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 		if options.ActorStrategyID != "" {
 			actorStrategyID = options.ActorStrategyID
 		}
-		if options.BaseActorStrategyID != "" {
-			baseActorStrategy = options.BaseActorStrategyID
+		if options.AfforderStrategyID != "" {
+			afforderStrategyID = options.AfforderStrategyID
 		}
 	}
 	if apiKeys == nil {
@@ -71,7 +71,7 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 		userMessage := trajectory.NewMessage(trajectory.MessageAuthorUser, fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
 		actor, err := actor.ActorStrategyByIDWithOptions(actorStrategyID, allModels, &actor.Options{
-			BaseActorStrategyID: baseActorStrategy,
+			AfforderStrategyID: afforderStrategyID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize actor: %w", err)
