@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"collaborativebrowser/actor"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/runner/finiterunner"
 	"collaborativebrowser/trajectory"
@@ -21,6 +22,7 @@ func main() {
 	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
 	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, reflexion]")
+	afforderStrategy := flag.String("afforder-strategy", "function_afforder", "the afforder strategy to use; one of [function_afforder, filter_afforder]")
 	verbose := flag.Bool("verbose", false, "whether to print verbose debug logs")
 	flag.Parse()
 
@@ -46,11 +48,15 @@ func main() {
 	if *actorStrategy == "" {
 		*actorStrategy = string(actor.DefaultActorStrategyID)
 	}
+	if *afforderStrategy == "" {
+		*afforderStrategy = string(afforder.DefaultAfforderStrategyID)
+	}
 	runner, err := finiterunner.NewFiniteRunnerFromInitialPage(ctx, *initialURL, apiKeys, &finiterunner.Options{
-		MaxNumSteps:     5,
-		BrowserOptions:  browserOptions,
-		LogPath:         *logPath,
-		ActorStrategyID: actor.ActorStrategyID(*actorStrategy),
+		MaxNumSteps:        5,
+		BrowserOptions:     browserOptions,
+		LogPath:            *logPath,
+		ActorStrategyID:    actor.ActorStrategyID(*actorStrategy),
+		AfforderStrategyID: afforder.AfforderStrategyID(*afforderStrategy),
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
