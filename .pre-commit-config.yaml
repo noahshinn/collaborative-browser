@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+  - repo: local
+    hooks:
+      - id: gofmt
+        name: format go code
+        description: Runs `gofmt` on Go files
+        language: system
+        entry: gofmt -l -w
+        types: [go]
+default_stages: [commit]
+default_install_hook_types: [pre-commit, commit-msg]
