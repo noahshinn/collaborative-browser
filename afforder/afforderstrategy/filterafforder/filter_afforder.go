@@ -83,7 +83,7 @@ First, list a description of the next action that should be taken. Then, list a 
 		},
 	}
 	var args map[string]interface{}
-	if res, err := fa.models.DefaultChatModel.Message(ctx, messages, &llm.MessageOptions{
+	if res, err := fa.models.ChatModels[llm.ChatModelGPT4].Message(ctx, messages, &llm.MessageOptions{
 		Temperature:  0.0,
 		Functions:    []*llm.FunctionDef{functionDef},
 		FunctionCall: "filter_affordances",
