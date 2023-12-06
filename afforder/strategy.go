@@ -3,7 +3,7 @@ package afforder
 import (
 	"collaborativebrowser/afforder/afforderstrategy"
 	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
-	"fmt"
+	"log"
 )
 
 type AfforderStrategyID string
@@ -14,11 +14,12 @@ const (
 
 const DefaultAfforderStrategyID = AfforderStrategyIDFunctionAfforder
 
-func AfforderStrategyByID(id AfforderStrategyID) (afforderstrategy.AfforderStrategy, error) {
+func AfforderStrategyByID(id AfforderStrategyID) afforderstrategy.AfforderStrategy {
 	switch id {
 	case AfforderStrategyIDFunctionAfforder:
-		return functionafforder.New(), nil
+		return functionafforder.New()
 	default:
-		return nil, fmt.Errorf("invalid afforder strategy ID: %s", id)
+		log.Printf("invalid afforder strategy ID: %s; defaulting to %s", id, DefaultAfforderStrategyID)
+		return functionafforder.New()
 	}
 }

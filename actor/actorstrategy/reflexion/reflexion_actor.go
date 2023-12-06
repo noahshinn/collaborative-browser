@@ -2,8 +2,9 @@ package reflexion
 
 import (
 	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/actor/actorstrategy/basellm"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/afforder/afforderstrategy"
-	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
@@ -22,13 +23,26 @@ type ReflexionActor struct {
 
 const DefaultMaxNumIterations = 3
 
-func New(models *llm.Models, baseActorStrategy actorstrategy.ActorStrategy, maxNumIterations int) actorstrategy.ActorStrategy {
-	afforder := functionafforder.New()
+func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.ActorStrategy {
+	afforderStrategyID := afforder.DefaultAfforderStrategyID
+	maxNumIterations := DefaultMaxNumIterations
+	if options != nil {
+		if options.AfforderStrategyID != "" {
+			afforderStrategyID = options.AfforderStrategyID
+		}
+		if options.MaxNumIterations > 0 {
+			maxNumIterations = options.MaxNumIterations
+		}
+	}
+	a := afforder.AfforderStrategyByID(afforderStrategyID)
+	baseActorStrategy := basellm.New(models, &actorstrategy.Options{
+		AfforderStrategyID: afforderStrategyID,
+	})
 	return &ReflexionActor{
 		models:            models,
 		maxNumIterations:  maxNumIterations,
 		baseActorStrategy: baseActorStrategy,
-		afforder:          afforder,
+		afforder:          a,
 	}
 }
 

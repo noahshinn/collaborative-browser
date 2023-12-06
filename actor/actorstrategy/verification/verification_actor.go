@@ -2,8 +2,9 @@ package verification
 
 import (
 	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/actor/actorstrategy/basellm"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/afforder/afforderstrategy"
-	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
@@ -16,16 +17,21 @@ type VerificationActor struct {
 	afforder          afforderstrategy.AfforderStrategy
 }
 
-type Options struct {
-	BaseActorStrategy actorstrategy.ActorStrategy
-}
-
-func New(models *llm.Models, baseActorStrategy actorstrategy.ActorStrategy) actorstrategy.ActorStrategy {
-	afforder := functionafforder.New()
+func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.ActorStrategy {
+	afforderStrategyID := afforder.DefaultAfforderStrategyID
+	if options != nil {
+		if options.AfforderStrategyID != "" {
+			afforderStrategyID = options.AfforderStrategyID
+		}
+	}
+	baseActorStrategy := basellm.New(models, &actorstrategy.Options{
+		AfforderStrategyID: afforderStrategyID,
+	})
+	a := afforder.AfforderStrategyByID(afforderStrategyID)
 	return &VerificationActor{
 		models:            models,
 		baseActorStrategy: baseActorStrategy,
-		afforder:          afforder,
+		afforder:          a,
 	}
 }
 

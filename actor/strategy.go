@@ -6,6 +6,7 @@ import (
 	"collaborativebrowser/actor/actorstrategy/react"
 	"collaborativebrowser/actor/actorstrategy/reflexion"
 	"collaborativebrowser/actor/actorstrategy/verification"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/llm"
 	"fmt"
 	"log"
@@ -26,14 +27,13 @@ func DefaultActorStrategy(models *llm.Models) actorstrategy.ActorStrategy {
 	actorStrategy, err := ActorStrategyByIDWithOptions(DefaultActorStrategyID, models, nil)
 	if err != nil {
 		log.Printf("error getting default actor strategy, defaulting to `base-llm`: %v", err)
-		return basellm.New(models)
+		return basellm.New(models, nil)
 	}
 	return actorStrategy
 }
 
 type Options struct {
-	// for verification and reflexion
-	BaseActorStrategyID ActorStrategyID
+	AfforderStrategyID afforder.AfforderStrategyID
 
 	// for reflexion
 	MaxNumIterations int
@@ -42,40 +42,19 @@ type Options struct {
 func ActorStrategyByIDWithOptions(strategyID ActorStrategyID, models *llm.Models, options *Options) (actorstrategy.ActorStrategy, error) {
 	switch strategyID {
 	case ActorStrategyIDBaseLLM:
-		return basellm.New(models), nil
+		return basellm.New(models, &actorstrategy.Options{
+			AfforderStrategyID: options.AfforderStrategyID,
+		}), nil
 	case ActorStrategyIDReact:
-		return react.New(models), nil
+		return react.New(models, &actorstrategy.Options{
+			AfforderStrategyID: options.AfforderStrategyID,
+		}), nil
 	case ActorStrategyIDVerification:
-		baseActorStrategyID := DefaultActorStrategyID
-		if options != nil {
-			if options.BaseActorStrategyID != "" {
-				if options.BaseActorStrategyID == strategyID {
-					return nil, fmt.Errorf("invalid base actor strategy ID: %s; this will cause an infinite loop", options.BaseActorStrategyID)
-				}
-				baseActorStrategyID = options.BaseActorStrategyID
-			}
-		}
-		baseActorStrategy, err := ActorStrategyByIDWithOptions(baseActorStrategyID, models, options)
-		if err != nil {
-			return nil, fmt.Errorf("error getting base actor strategy: %w", err)
-		}
-		return verification.New(models, baseActorStrategy), nil
+		return verification.New(models, nil), nil
 	case ActorStrategyIDReflexion:
-		baseActorStrategyID := DefaultActorStrategyID
-		maxNumIterations := reflexion.DefaultMaxNumIterations
-		if options != nil {
-			if options.BaseActorStrategyID != "" {
-				if options.BaseActorStrategyID == strategyID {
-					return nil, fmt.Errorf("invalid base actor strategy ID: %s; this will cause an infinite loop", options.BaseActorStrategyID)
-				}
-				baseActorStrategyID = options.BaseActorStrategyID
-			}
-		}
-		baseActorStrategy, err := ActorStrategyByIDWithOptions(baseActorStrategyID, models, options)
-		if err != nil {
-			return nil, fmt.Errorf("error getting base actor strategy: %w", err)
-		}
-		return reflexion.New(models, baseActorStrategy, maxNumIterations), nil
+		return reflexion.New(models, &actorstrategy.Options{
+			MaxNumIterations: options.MaxNumIterations,
+		}), nil
 	}
 	return nil, fmt.Errorf("invalid actor strategy ID: %s", strategyID)
 }

@@ -2,6 +2,8 @@ package react
 
 import (
 	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/afforder"
+	"collaborativebrowser/afforder/afforderstrategy"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
@@ -9,12 +11,21 @@ import (
 )
 
 type ReactActor struct {
-	models *llm.Models
+	models   *llm.Models
+	afforder afforderstrategy.AfforderStrategy
 }
 
-func New(models *llm.Models) actorstrategy.ActorStrategy {
+func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.ActorStrategy {
+	afforderStrategyID := afforder.DefaultAfforderStrategyID
+	if options != nil {
+		if options.AfforderStrategyID != "" {
+			afforderStrategyID = options.AfforderStrategyID
+		}
+	}
+	a := afforder.AfforderStrategyByID(afforderStrategyID)
 	return &ReactActor{
-		models: models,
+		models:   models,
+		afforder: a,
 	}
 }
 

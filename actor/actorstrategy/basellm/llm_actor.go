@@ -2,8 +2,8 @@ package basellm
 
 import (
 	"collaborativebrowser/actor/actorstrategy"
+	"collaborativebrowser/afforder"
 	"collaborativebrowser/afforder/afforderstrategy"
-	"collaborativebrowser/afforder/afforderstrategy/functionafforder"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
@@ -16,8 +16,14 @@ type BaseLLMActor struct {
 	afforder afforderstrategy.AfforderStrategy
 }
 
-func New(models *llm.Models) actorstrategy.ActorStrategy {
-	a := functionafforder.New()
+func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.ActorStrategy {
+	afforderStrategyID := afforder.DefaultAfforderStrategyID
+	if options != nil {
+		if options.AfforderStrategyID != "" {
+			afforderStrategyID = options.AfforderStrategyID
+		}
+	}
+	a := afforder.AfforderStrategyByID(afforderStrategyID)
 	return &BaseLLMActor{
 		models:   models,
 		afforder: a,
