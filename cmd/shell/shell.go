@@ -10,6 +10,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 )
 
@@ -19,7 +21,13 @@ func main() {
 	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
 	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, reflexion]")
+	verbose := flag.Bool("verbose", false, "whether to print verbose debug logs")
 	flag.Parse()
+
+	if !*verbose {
+		log.SetFlags(0)
+		log.SetOutput(io.Discard)
+	}
 
 	browserOptions := []browser.BrowserOption{
 		browser.BrowserOptionAttemptToDisableAutomationMessage,
