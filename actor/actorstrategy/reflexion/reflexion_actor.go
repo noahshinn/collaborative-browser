@@ -34,7 +34,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 			maxNumIterations = options.MaxNumIterations
 		}
 	}
-	a := afforder.AfforderStrategyByID(afforderStrategyID)
+	a := afforder.AfforderStrategyByID(afforderStrategyID, models)
 	baseActorStrategy := basellm.New(models, &actorstrategy.Options{
 		AfforderStrategyID: afforderStrategyID,
 	})
@@ -47,7 +47,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 }
 
 func (a *ReflexionActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
-	_, actionSpace, err := a.afforder.GetAffordances(traj, br)
+	_, actionSpace, err := a.afforder.GetAffordances(ctx, traj, br)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get affordances: %w", err)
 	}

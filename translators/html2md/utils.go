@@ -139,7 +139,7 @@ func cleanup(mdText string) string {
 
 	// remove trailing spaces for each line
 	lines := strings.Split(s, "\n")
-	s = strings.Join(slicesx.Map(lines, func(str string) string {
+	s = strings.Join(slicesx.Map(lines, func(str string, _ int) string {
 		return strings.TrimSpace(str)
 	}), "\n")
 

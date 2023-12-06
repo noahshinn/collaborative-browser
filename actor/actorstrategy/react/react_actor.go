@@ -22,7 +22,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 			afforderStrategyID = options.AfforderStrategyID
 		}
 	}
-	a := afforder.AfforderStrategyByID(afforderStrategyID)
+	a := afforder.AfforderStrategyByID(afforderStrategyID, models)
 	return &ReactActor{
 		models:   models,
 		afforder: a,

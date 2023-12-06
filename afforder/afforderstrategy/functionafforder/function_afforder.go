@@ -7,6 +7,7 @@ import (
 	"collaborativebrowser/browser/virtualid"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -103,11 +104,16 @@ func New() afforderstrategy.AfforderStrategy {
 	}
 }
 
-func (a *FunctionAfforder) GetAffordances(traj *trajectory.Trajectory, br *browser.Browser) ([]*llm.Message, []*llm.FunctionDef, error) {
+func (a *FunctionAfforder) GetAffordances(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) ([]*llm.Message, []*llm.FunctionDef, error) {
 	pageRender, err := br.Render(language.LanguageMD)
 	if err != nil {
 		return nil, nil, fmt.Errorf("browser failed to render page: %w", err)
 	}
+	messages := a.GetMessageAffordances(pageRender, traj)
+	return messages, a.permissibleFunctions, nil
+}
+
+func (a *FunctionAfforder) GetMessageAffordances(browserRender string, traj *trajectory.Trajectory) []*llm.Message {
 	state := fmt.Sprintf(`----- START BROWSER -----
 %s
 ----- END BROWSER -----
@@ -115,7 +121,7 @@ func (a *FunctionAfforder) GetAffordances(traj *trajectory.Trajectory, br *brows
 ----- START TRAJECTORY -----
 %s
 ----- END TRAJECTORY -----
-`, pageRender, traj.GetAbbreviatedText())
+`, browserRender, traj.GetAbbreviatedText())
 	messages := []*llm.Message{
 		{
 			Role:    llm.MessageRoleSystem,
@@ -126,7 +132,11 @@ func (a *FunctionAfforder) GetAffordances(traj *trajectory.Trajectory, br *brows
 			Content: fmt.Sprintf("%s\n\nLook at the Trajectory to inform your next action.", strings.TrimSpace(state)),
 		},
 	}
-	return messages, a.permissibleFunctions, nil
+	return messages
+}
+
+func (a *FunctionAfforder) GetFunctionAffordances() []*llm.FunctionDef {
+	return a.permissibleFunctions
 }
 
 func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {

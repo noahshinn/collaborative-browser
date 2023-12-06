@@ -27,7 +27,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 	baseActorStrategy := basellm.New(models, &actorstrategy.Options{
 		AfforderStrategyID: afforderStrategyID,
 	})
-	a := afforder.AfforderStrategyByID(afforderStrategyID)
+	a := afforder.AfforderStrategyByID(afforderStrategyID, models)
 	return &VerificationActor{
 		models:            models,
 		baseActorStrategy: baseActorStrategy,

@@ -59,8 +59,13 @@ type Parameters struct {
 }
 
 type Property struct {
-	Type        string `json:"type"`
-	Description string `json:"description"`
+	Type        string      `json:"type"`
+	Description string      `json:"description"`
+	Items       *ArrayItems `json:"items,omitempty"`
+}
+
+type ArrayItems struct {
+	Type string `json:"type"`
 }
 
 type FunctionCall struct {

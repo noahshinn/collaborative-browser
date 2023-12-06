@@ -1,0 +1,15 @@
+# Context
+You will be given a text display of a web browser within a BROWSER window. You will also be given a conversation trajectory between you (an AI web browsing assistant) and a human user. Each line of content in the text web browser will be numbered in the format [<number>] <content>. Your goal is to read the browser content, read the trajectory, write a description of the intent of the next action, and then write a comma-delimited sequence of numbers or number ranges of irrelevant lines.
+
+# Task
+Your task is to describe the intent to prove that you understand the next action to take, then write the numbers or ranges of the irrelevant lines to the next future action at hand. These lines will be removed from the text browser display so that a future language model will not have unnecessary context in the text view. Beware: removing important lines may affect the performance of the future language model.
+
+# Syntax
+Write a newline-delimited sequence of numbers. Acceptable items in the sequence:
+single number: "<number>"
+range: "<start number>-<end number>" or ":<number>" (start to the number) or "<number>:" (number to the end)
+
+Each number or range must be followed with a short few-word description of why it is being removed. For example:
+<single number or range> description="<the description>"
+
+Note: the end number is not inclusive.

@@ -23,7 +23,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 			afforderStrategyID = options.AfforderStrategyID
 		}
 	}
-	a := afforder.AfforderStrategyByID(afforderStrategyID)
+	a := afforder.AfforderStrategyByID(afforderStrategyID, models)
 	return &BaseLLMActor{
 		models:   models,
 		afforder: a,
@@ -31,7 +31,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 }
 
 func (a *BaseLLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
-	messages, functionDefs, err := a.afforder.GetAffordances(traj, br)
+	messages, functionDefs, err := a.afforder.GetAffordances(ctx, traj, br)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get affordances: %w", err)
 	}

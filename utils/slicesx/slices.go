@@ -1,17 +1,17 @@
 package slicesx
 
-func Map[T, U any](s []T, f func(T) U) []U {
+func Map[T, U any](s []T, f func(item T, idx int) U) []U {
 	mapped := make([]U, len(s))
-	for i, v := range s {
-		mapped[i] = f(v)
+	for idx, v := range s {
+		mapped[idx] = f(v, idx)
 	}
 	return mapped
 }
 
-func Filter[T any](s []T, f func(T) bool) []T {
-	filtered := make([]T, 0)
-	for _, v := range s {
-		if f(v) {
+func Filter[T any](s []T, f func(item T, idx int) bool) []T {
+	filtered := []T{}
+	for idx, v := range s {
+		if f(v, idx) {
 			filtered = append(filtered, v)
 		}
 	}
