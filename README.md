@@ -1,6 +1,6 @@
 # Collaborative Browser
 
-The Collaborative Browser is a shared interface for many users. This project focuses on the design of intuitive _environments_ that offer proper affordances, not smart _users_ with extensive planning and reflection modules to accomplish complex tasks.
+The Collaborative Browser is a shared interface for many users. This project focuses on the design of intuitive _environments_ that offer proper affordances, not smart _users_ with extensive planning and reflection modules to accomplish complex tasks. Thus, if an incorrect action is chosen, it is not the user's fault. Rather, it is the environment's fault for not affording an appropriate action space.
 
 ## To run the shell
 
