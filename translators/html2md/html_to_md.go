@@ -150,7 +150,7 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				return ""
 			}
 			return fmt.Sprintf("## Nav Bar\n\n%s", strings.Join(items, "\n"))
-		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small":
+		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small", "bdi":
 			return strings.Join(content, "\n")
 		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center", "picture":
 			return strings.Join(content, "")

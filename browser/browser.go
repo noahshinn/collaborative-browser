@@ -148,12 +148,14 @@ func (b *Browser) Navigate(URL string) error {
 func (b *Browser) AddVirtualIDs() string {
 	// TODO: invoke custom vID generator
 	const f = `function addDataVidAttribute() {
-	const elements = document.querySelectorAll('button, input, a');
+	const elements = document.querySelectorAll('button, input, a, textarea');
 	let counter = 0;
 	elements.forEach(element => {
-		element.setAttribute('data-vid', "vid-" + counter.toString());
-		counter++;
-		console.log(counter);
+		if (element.offsetParent !== null) {
+			element.setAttribute('data-vid', "vid-" + counter.toString());
+			counter++;
+			console.log(counter);
+		}
 	});
 }
 addDataVidAttribute();`
