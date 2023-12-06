@@ -150,11 +150,13 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 				return ""
 			}
 			return fmt.Sprintf("## Nav Bar\n\n%s", strings.Join(items, "\n"))
-		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small", "bdi":
+		case "sup":
+			return "^{" + strings.Join(content, "") + "}"
+		case "div", "section", "body", "header", "form", "dialog", "ul", "ol", "small", "bdi", "template", "summary", "details", "dl", "dt", "dd", "main":
 			return strings.Join(content, "\n")
-		case "p", "span", "g", "figure", "desc", "footer", "html", "main", "legend", "fieldset", "center", "picture":
-			return strings.Join(content, "")
-		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image", "polygon", "source", "use":
+		case "p", "span", "g", "figure", "desc", "footer", "html", "legend", "fieldset", "center", "picture":
+			return strings.Join(content, " ")
+		case "head", "script", "style", "iframe", "svg", "meso-native", "meso-display-ad", "grammarly-desktop-integration", "path", "noscript", "link", "meta", "label", "circle", "rect", "image", "polygon", "source", "use", "canvas":
 			return ""
 		default:
 			log.Printf("Found unknown element: %v\n", n.Data)
