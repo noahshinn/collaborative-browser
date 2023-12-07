@@ -106,6 +106,7 @@ func (b *Browser) run(actions ...chromedp.Action) error {
 }
 
 func (b *Browser) Click(id virtualid.VirtualID) error {
+	previousLocation := b.display.Location
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
 	} else if exists, err := b.DoesVirtualIDExist(string(id)); err != nil {
@@ -116,9 +117,18 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 		return fmt.Errorf("error checking element type for virtual id: %w", err)
 	} else if elementType != ElementTypeButton && elementType != ElementTypeLink {
 		return fmt.Errorf("cannot click element type %s", elementType)
-	} else {
-		return b.ClickByVirtualID(string(id))
+	} else if err := b.ClickByVirtualID(string(id)); err != nil {
+		return fmt.Errorf("error clicking by virtual id: %w", err)
+	} else if err := b.updateDisplay(); err != nil {
+		return fmt.Errorf("error updating display: %w", err)
+	} else if previousLocation != b.display.Location {
+		if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
+			log.Println("error checking if browser supports aria labels:", err)
+		} else if !supportsAriaLabels {
+			log.Println("warning: browser does not support aria labels")
+		}
 	}
+	return nil
 }
 
 func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
@@ -144,9 +154,14 @@ func (b *Browser) Navigate(URL string) error {
 		return fmt.Errorf("error ensuring scheme: %w", err)
 	} else if valid, err := IsValidURL(u); !valid {
 		return fmt.Errorf("invalid url %s: %w", u, err)
-	} else {
-		return b.run(chromedp.Navigate(u), chromedp.Sleep(1*time.Second))
+	} else if err := b.run(chromedp.Navigate(u), chromedp.Sleep(1*time.Second)); err != nil {
+		return fmt.Errorf("error navigating to %s: %w", u, err)
+	} else if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
+		log.Println("error checking if browser supports aria labels:", err)
+	} else if !supportsAriaLabels {
+		log.Println("warning: browser does not support aria labels")
 	}
+	return nil
 }
 
 func (b *Browser) addVirtualIDs() error {

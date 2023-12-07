@@ -61,21 +61,18 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 	case html.ElementNode:
 		content := t.visitChildren(n)
 		attrMap := buildAttrMapFromNode(n)
+		virtualID := attrMap["data-vid"]
 		switch n.Data {
 		case "button":
-			innerText := parseInnerText(content)
-			virtualID, ok := attrMap["data-vid"]
-			if !ok {
+			if !isClickable(n, attrMap) {
 				return strings.Join(content, "\n")
+			} else if label, isClickable := getLabelForClickable(n, attrMap, content); !isClickable {
+				return strings.Join(content, "\n")
+			} else {
+				return renderSelectable(SelectableTypeButton, virtualID, label, "")
 			}
-			if innerText == "" {
-				return ""
-			}
-			return renderSelectable(SelectableTypeButton, virtualID, innerText, "")
 		case "input", "textarea":
-			if virtualID, ok := attrMap["data-vid"]; !ok {
-				return strings.Join(content, "\n")
-			} else if !isInputable(n, attrMap) {
+			if !isInputable(n, attrMap) {
 				return strings.Join(content, "\n")
 			} else if label, isInputable := getLabelForInputable(n, attrMap); !isInputable {
 				return strings.Join(content, "\n")
@@ -109,18 +106,12 @@ func (t *HTML2MDTranslator) Visit(n *html.Node) string {
 		case "video":
 			return "<video>"
 		case "a":
-			if virtualID, ok := attrMap["data-vid"]; !ok {
+			if !isClickable(n, attrMap) {
 				return strings.Join(content, "\n")
-			} else if !isClickable(n, attrMap) {
+			} else if label, isClickable := getLabelForClickable(n, attrMap, content); !isClickable {
 				return strings.Join(content, "\n")
 			} else {
-				innerText := parseInnerText(content)
-				href, ok := attrMap["href"]
-				if !ok {
-					return strings.Join(content, "\n")
-				}
-				strippedQueryParams := stripQueryParamsFromPossibleFullURL(href)
-				return renderSelectable(SelectableTypeLink, virtualID, innerText, fmt.Sprintf("href=\"%s\"", strippedQueryParams))
+				return renderSelectable(SelectableTypeLink, virtualID, label, "")
 			}
 		case "li":
 			text := strings.Join(content, "")

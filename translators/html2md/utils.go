@@ -64,25 +64,53 @@ func renderSelectable(typ SelectableType, virtualID string, primaryContent strin
 	return fmt.Sprintf("[%s%s, type=%s](%s)", primaryContent, suffix, typ, virtualID)
 }
 
+var whitelistedImportantAttributeValues = map[string][]string{
+	"name": {"login", "search"},
+}
+
 func isClickable(n *html.Node, attrMap map[string]string) bool {
-	if n.Data != "a" && n.Data != "button" {
+	if _, ok := attrMap["data-vid"]; !ok {
+		return false
+	} else if n.Data != "a" && n.Data != "button" {
 		return false
 	} else if ariaHidden, ok := attrMap["aria-hidden"]; ok && ariaHidden == "true" {
 		return false
 	}
+	if ariaLabel, ok := attrMap["aria-label"]; ok && ariaLabel != "" {
+		return true
+	} else if name, ok := attrMap["name"]; ok && name != "" {
+		if importantNameValues, ok := whitelistedImportantAttributeValues["name"]; ok {
+			if slicesx.Contains(importantNameValues, name) {
+				return true
+			}
+		}
+	}
 
+	if typ, ok := attrMap["type"]; ok && typ == "submit" {
+		return true
+	}
 	if n.Data == "a" {
 		if href, ok := attrMap["href"]; ok && href != "" {
 			return true
+		} else if role, ok := attrMap["role"]; ok && role == "button" {
+			return true
+		} else if name, ok := attrMap["name"]; ok && name == "login" {
+			return true
 		}
 	} else if n.Data == "button" {
-		return true
+		if ariaExpanded, ok := attrMap["aria-expanded"]; ok {
+			return ariaExpanded == "true" || ariaExpanded == "false"
+		} else if inForm := isInForm(n); inForm {
+			return true
+		}
 	}
 	return false
 }
 
 func isInputable(n *html.Node, attrMap map[string]string) bool {
-	if n.Data != "input" && n.Data != "textarea" {
+	if _, ok := attrMap["data-vid"]; !ok {
+		return false
+	} else if n.Data != "input" && n.Data != "textarea" {
 		return false
 	} else if typ, ok := attrMap["type"]; !ok || typ == "hidden" {
 		return false
@@ -116,6 +144,49 @@ func isInputable(n *html.Node, attrMap map[string]string) bool {
 	return false
 }
 
+// TODO: this is currently more conservative than isClickable
+func getLabelForClickable(n *html.Node, attrMap map[string]string, childContent []string) (label string, isClickable bool) {
+	if n.Data != "a" && n.Data != "button" {
+		return "", false
+	} else if ariaLabel, ok := attrMap["aria-label"]; ok && ariaLabel != "" {
+		return ariaLabel, true
+	}
+	innerText := parseInnerText(childContent)
+	var importantAttributePairs []string
+	var prefix string
+	for attr, values := range whitelistedImportantAttributeValues {
+		if value, ok := attrMap[attr]; ok && slicesx.Contains(values, value) {
+			importantAttributePairs = append(importantAttributePairs, fmt.Sprintf("%s=%s", attr, value))
+		}
+	}
+	if len(importantAttributePairs) > 0 {
+		prefix = fmt.Sprintf("%s, ", strings.Join(importantAttributePairs, ", "))
+	}
+	if n.Data == "a" {
+		href, ok := attrMap["href"]
+		if !ok {
+			return "", false
+		}
+		strippedQueryParams := stripQueryParamsFromPossibleFullURL(href)
+		if innerText == "" {
+			return fmt.Sprintf("%shref=%s", prefix, strippedQueryParams), true
+		} else {
+			return fmt.Sprintf("%sinner-text=%s, href=%s", prefix, innerText, strippedQueryParams), true
+		}
+	}
+	if typ, ok := attrMap["type"]; (!ok || typ != "submit") && innerText == "" {
+		return "", false
+	} else {
+		if typ == "submit" {
+			prefix = prefix + "type=submit"
+		}
+		if innerText != "" {
+			prefix = prefix + "inner-text=" + innerText
+		}
+		return strings.TrimRight(prefix, ", "), true
+	}
+}
+
 // TODO: this is currently more conservative than isInputable
 func getLabelForInputable(n *html.Node, attrMap map[string]string) (label string, isInputable bool) {
 	if n.Data != "input" && n.Data != "textarea" {
@@ -128,6 +199,16 @@ func getLabelForInputable(n *html.Node, attrMap map[string]string) (label string
 		return autocompleteType, true
 	}
 	return "", false
+}
+
+func isInForm(n *html.Node) bool {
+	if n.Data == "form" {
+		return true
+	}
+	if n.Parent == nil {
+		return false
+	}
+	return isInForm(n.Parent)
 }
 
 func cleanup(mdText string) string {

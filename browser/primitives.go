@@ -106,3 +106,18 @@ getAllVisibleVirtualIDs();`
 		return virtualIDs, nil
 	}
 }
+
+func (b *Browser) DoesSupportAriaLabels() (bool, error) {
+	js := `function doesSupportAriaLabels() {
+	const ariaLabelElems = document.querySelectorAll('[aria-label]');
+	return ariaLabelElems.length > 0;
+}
+doesSupportAriaLabels();
+`
+	var supportsAriaLabels bool
+	if err := b.run(chromedp.Evaluate(js, &supportsAriaLabels)); err != nil {
+		return false, fmt.Errorf("error checking if browser supports aria labels: %w", err)
+	} else {
+		return supportsAriaLabels, nil
+	}
+}
