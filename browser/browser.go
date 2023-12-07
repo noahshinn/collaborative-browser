@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,21 +149,32 @@ func (b *Browser) Navigate(URL string) error {
 	}
 }
 
-func (b *Browser) AddVirtualIDs() string {
+func (b *Browser) addVirtualIDs() error {
+	existingVirtualIDs, err := b.GetAllVisibleVirtualIDs()
+	if err != nil {
+		log.Println("error getting existing virtual ids:", err)
+		return nil
+	}
 	// TODO: invoke custom vID generator
-	const f = `function addDataVidAttribute() {
+	js := fmt.Sprintf(`function addDataVidAttribute(excludeIDs) {
+	const reservedIDs = {};
+	excludeIDs.forEach(id => reservedIDs[id] = true);
 	const elements = document.querySelectorAll('button, input, a, textarea');
 	let counter = 0;
 	elements.forEach(element => {
-		if (element.offsetParent !== null) {
+		if (element.offsetParent !== null && !element.hasAttribute('data-vid')) {
+			while (reservedIDs["vid-" + counter.toString()]) {
+				counter++;
+			}
 			element.setAttribute('data-vid', "vid-" + counter.toString());
 			counter++;
-			console.log(counter);
 		}
 	});
 }
-addDataVidAttribute();`
-	return f
+addDataVidAttribute(%s);`, "["+strings.Join(slicesx.Map(existingVirtualIDs, func(virtualID string, _ int) string {
+		return fmt.Sprintf(`"%s"`, virtualID)
+	}), ", ")+"]")
+	return b.run(chromedp.Evaluate(js, nil))
 }
 
 func (b *Browser) Render(lang language.Language) (content string, err error) {
@@ -170,7 +182,7 @@ func (b *Browser) Render(lang language.Language) (content string, err error) {
 		return "", fmt.Errorf("error getting location: %w", err)
 	} else if translator, ok := b.translators[lang]; !ok {
 		return "", fmt.Errorf("unsupported language: %s", lang)
-	} else if err := b.run(chromedp.Evaluate(b.AddVirtualIDs(), nil)); err != nil {
+	} else if err := b.addVirtualIDs(); err != nil {
 		return "", err
 	} else if html, err := b.getHTML(); err != nil {
 		return "", fmt.Errorf("error getting html for location %s: %w", location, err)

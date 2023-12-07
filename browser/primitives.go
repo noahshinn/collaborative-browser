@@ -89,3 +89,20 @@ checkElementTypeForQuerySelector('%s');`, query)
 func (b *Browser) CheckElementTypeForVirtualID(virtualID string) (ElementType, error) {
 	return b.CheckElementTypeForQuerySelector(fmt.Sprintf("[data-vid=\"%s\"]", virtualID))
 }
+
+func (b *Browser) GetAllVisibleVirtualIDs() ([]string, error) {
+	js := `function getAllVisibleVirtualIDs() {
+	const elements = document.querySelectorAll('[data-vid]');
+	const dataVids = Array.from(elements).map(element => element.getAttribute('data-vid'));
+	return dataVids;
+}
+getAllVisibleVirtualIDs();`
+	var virtualIDs []string
+	if err := b.run(chromedp.Evaluate(js, &virtualIDs)); err != nil {
+		return nil, fmt.Errorf("error getting all visible virtual IDs: %w", err)
+	} else if virtualIDs == nil {
+		return nil, fmt.Errorf("error getting all visible virtual IDs: virtual IDs is nil")
+	} else {
+		return virtualIDs, nil
+	}
+}
