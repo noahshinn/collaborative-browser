@@ -17,6 +17,7 @@ go run ./cmd/shell/shell.go -url scholar.google.com -headful
 Built-in commands:
 
 - `help`: prints some usage instructions
+- `headful`: if the current browser is running headless, open the headful representation
 - `log`: logs the current browser and trajectory to the specified log path
 - `exit`: gracefully exits the shell
 

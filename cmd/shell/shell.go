@@ -64,9 +64,7 @@ func main() {
 	runner.Log()
 	printx.PrintStandardHeader("TRAJECTORY")
 	fmt.Println()
-	for _, item := range runner.Trajectory().Items {
-		fmt.Println(item.GetAbbreviatedText())
-	}
+	runner.DisplayTrajectory()
 
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("user: ")
@@ -75,6 +73,13 @@ ScannerLoop:
 		userMessageText := scanner.Text()
 		switch userMessageText {
 		case "":
+			fmt.Print("user: ")
+			continue ScannerLoop
+		case "headful":
+			printx.PrintInColor(printx.ColorGray, "Running browser in headful mode...")
+			if err := runner.RunHeadful(); err != nil {
+				printx.PrintInColor(printx.ColorYellow, fmt.Sprintf("Failed to run browser in headful mode: %s, continuing in headless mode", err.Error()))
+			}
 			fmt.Print("user: ")
 			continue ScannerLoop
 		case "exit":
@@ -91,7 +96,7 @@ ScannerLoop:
 			fmt.Print("user: ")
 			continue ScannerLoop
 		default:
-			runner.Trajectory().AddItem(trajectory.NewMessage(trajectory.MessageAuthorUser, userMessageText))
+			runner.AddItemToTrajectory(trajectory.NewMessage(trajectory.MessageAuthorUser, userMessageText))
 			stream, err := runner.RunAndStream()
 			if err != nil {
 				panic(fmt.Errorf("failed to run and stream: %w", err))

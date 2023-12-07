@@ -6,9 +6,11 @@ import (
 	"collaborativebrowser/trajectory"
 	"collaborativebrowser/translators"
 	"collaborativebrowser/translators/html2md"
+	"collaborativebrowser/utils/slicesx"
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -17,13 +19,14 @@ import (
 )
 
 type Browser struct {
-	mu           *sync.Mutex
-	ctx          context.Context
-	cancel       context.CancelFunc
-	options      []BrowserOption
-	vIDGenerator virtualid.VirtualIDGenerator
-	translators  map[language.Language]translators.Translator
-	display      *BrowserDisplay
+	mu                *sync.Mutex
+	ctx               context.Context
+	cancel            context.CancelFunc
+	options           []BrowserOption
+	vIDGenerator      virtualid.VirtualIDGenerator
+	translators       map[language.Language]translators.Translator
+	display           *BrowserDisplay
+	isRunningHeadless bool
 }
 
 type BrowserOption string
@@ -216,8 +219,28 @@ func (b *Browser) Cancel() {
 	b.cancel()
 }
 
-func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
-	vIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
+func (b *Browser) IsRunningHeadless() bool {
+	return b.isRunningHeadless
+}
+
+func (b *Browser) RunHeadful(ctx context.Context) error {
+	if !b.isRunningHeadless {
+		log.Println("requested to run the browser in headful mode but this browser is already running in headful mode")
+		return nil
+	}
+	log.Println("running the browser in headful mode; warning: you will lose all non-location state from the current browser")
+	newOps := append(b.options, BrowserOptionHeadful)
+	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	b.ctx = newBrowserCtx
+	b.cancel = newBrowserCancelFunc
+	if err := b.Navigate(b.display.Location); err != nil {
+		return fmt.Errorf("error navigating to current location %s: %w", b.display.Location, err)
+	}
+	b.isRunningHeadless = false
+	return nil
+}
+
+func buildOptions(options ...BrowserOption) []func(*chromedp.ExecAllocator) {
 	ops := chromedp.DefaultExecAllocatorOptions[:]
 	for _, option := range options {
 		switch option {
@@ -229,19 +252,32 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		default:
 		}
 	}
+	return ops
+}
+
+func newBrowser(ctx context.Context, options ...BrowserOption) (browserCtx context.Context, cancelFunc context.CancelFunc) {
+	ops := buildOptions(options...)
+	parentCtx, _ := chromedp.NewExecAllocator(ctx, ops...)
+	browserCtx, cancel := chromedp.NewContext(parentCtx)
+	return browserCtx, cancel
+}
+
+func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
+	isRunningHeadless := !slicesx.Contains(options, BrowserOptionHeadful)
+	vIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	htmlToMDTranslator := html2md.NewHTML2MDTranslator(nil)
 	translatorMap := map[language.Language]translators.Translator{
 		language.LanguageMD: htmlToMDTranslator,
 	}
-	parentCtx, _ := chromedp.NewExecAllocator(context.Background(), ops...)
-	browserCtx, cancel := chromedp.NewContext(parentCtx)
+	browserCtx, cancel := newBrowser(ctx, options...)
 	return &Browser{
-		mu:           &sync.Mutex{},
-		ctx:          browserCtx,
-		cancel:       cancel,
-		options:      options,
-		vIDGenerator: vIDGenerator,
-		translators:  translatorMap,
-		display:      &BrowserDisplay{},
+		mu:                &sync.Mutex{},
+		ctx:               browserCtx,
+		cancel:            cancel,
+		options:           options,
+		vIDGenerator:      vIDGenerator,
+		translators:       translatorMap,
+		display:           &BrowserDisplay{},
+		isRunningHeadless: isRunningHeadless,
 	}
 }

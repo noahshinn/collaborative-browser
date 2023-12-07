@@ -168,16 +168,14 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 	return stream, nil
 }
 
-func (r *FiniteRunner) Trajectory() *trajectory.Trajectory {
-	return r.trajectory
+func (r *FiniteRunner) AddItemToTrajectory(item trajectory.TrajectoryItem) {
+	r.trajectory.AddItem(item)
 }
 
-func (r *FiniteRunner) Actor() actorstrategy.ActorStrategy {
-	return r.actor
-}
-
-func (r *FiniteRunner) Browser() *browser.Browser {
-	return r.browser
+func (r *FiniteRunner) DisplayTrajectory() {
+	for _, item := range r.trajectory.Items {
+		fmt.Println(item.GetAbbreviatedText())
+	}
 }
 
 func (r *FiniteRunner) Log() error {
@@ -200,6 +198,10 @@ func (r *FiniteRunner) Log() error {
 	} else {
 		return nil
 	}
+}
+
+func (r *FiniteRunner) RunHeadful() error {
+	return r.browser.RunHeadful(r.ctx)
 }
 
 func (r *FiniteRunner) Terminate() {
