@@ -21,8 +21,8 @@ func main() {
 	runHeadful := flag.Bool("headful", false, "run the browser in non-headless mode")
 	logPath := flag.String("log-path", "out", "the path to write the trajectory and browser display to")
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
-	actorStrategy := flag.String("actor-strategy", "base_llm", "the actor strategy to use; one of [base_llm, reflexion]")
-	afforderStrategy := flag.String("afforder-strategy", "function_afforder", "the afforder strategy to use; one of [function_afforder, filter_afforder]")
+	actorStrategy := flag.String("actor-strategy", "base", "the actor strategy to use; one of [\"base\", \"reflexion\"]")
+	afforderStrategy := flag.String("afforder-strategy", "function", "the afforder strategy to use; one of [\"function\", filter\"]")
 	verbose := flag.Bool("verbose", false, "whether to print verbose debug logs")
 	flag.Parse()
 

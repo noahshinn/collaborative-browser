@@ -43,24 +43,6 @@ func (fa *FilterAfforder) filterBrowserDisplay(ctx context.Context, br *browser.
 	rawBrowserDisplay := br.GetDisplay().MD
 	numberedBrowserDisplay := displayBrowserContentWithLineno(rawBrowserDisplay)
 	trajDisplay := traj.GetAbbreviatedText()
-	messages := []*llm.Message{
-		{
-			Role:    llm.MessageRoleSystem,
-			Content: systemPromptToFilterAffordances,
-		},
-		{
-			Role: llm.MessageRoleUser,
-			Content: fmt.Sprintf(`----- START BROWSER -----
-%s
------ END BROWSER -----
-
------ START TRAJECTORY -----
-%s
------ END TRAJECTORY -----
-
-First, list a description of the next action that should be taken. Then, list a sequence of the irrelevant lines. These lines will be deleted and the remaining lines will be displayed as the web browser for your next action.`, numberedBrowserDisplay, trajDisplay),
-		},
-	}
 	functionDef := &llm.FunctionDef{
 		Name:        "filter_irrelevant_lines",
 		Description: "Filter out the irrelevant lines from the browser display. The remaining lines will be displayed as the web browser for your next action.",
@@ -82,17 +64,35 @@ First, list a description of the next action that should be taken. Then, list a 
 			Required: []string{"next_action_description", "irrelevant_lines"},
 		},
 	}
+	messages := []*llm.Message{
+		{
+			Role:    llm.MessageRoleSystem,
+			Content: systemPromptToFilterAffordances,
+		},
+		{
+			Role: llm.MessageRoleUser,
+			Content: fmt.Sprintf(`----- START BROWSER -----
+%s
+----- END BROWSER -----
+
+----- START TRAJECTORY -----
+%s
+----- END TRAJECTORY -----
+
+First, list a description of the next action that should be taken. Then, list a sequence of the irrelevant lines. These lines will be deleted and the remaining lines will be displayed as the web browser for your next action. Use the %s function call.`, numberedBrowserDisplay, trajDisplay, functionDef.Name),
+		},
+	}
 	var args map[string]interface{}
 	if res, err := fa.models.ChatModels[llm.ChatModelGPT4].Message(ctx, messages, &llm.MessageOptions{
 		Temperature:  0.0,
 		Functions:    []*llm.FunctionDef{functionDef},
-		FunctionCall: "filter_affordances",
+		FunctionCall: functionDef.Name,
 	}); err != nil {
 		return "", fmt.Errorf("failed to get response from chat model: %w", err)
 	} else if res.FunctionCall == nil {
 		return "", fmt.Errorf("response from chat model did not include a function call")
-	} else if res.FunctionCall.Name != "filter_affordances" {
-		return "", fmt.Errorf("response from chat model did not include a function call to filter_affordances")
+	} else if res.FunctionCall.Name != functionDef.Name {
+		return "", fmt.Errorf("response from chat model did not include a function call to %s", functionDef.Name)
 	} else if err := json.Unmarshal([]byte(res.FunctionCall.Arguments), &args); err != nil {
 		return "", fmt.Errorf("failed to unmarshal arguments from chat model response: %w", err)
 	} else if irrelevantLinesRes, ok := args["irrelevant_lines"].([]interface{}); !ok {
@@ -124,7 +124,7 @@ func displayBrowserContentWithLineno(s string) string {
 
 func parseIrrelevantLinesResult(res []string) (map[int]struct{}, error) {
 	irrelevantLines := make(map[int]struct{})
-	re := regexp.MustCompile(`^(\d+(:|-)\d+|:\d+|\d+:|<\d+>) description="(.+)"$`)
+	re := regexp.MustCompile(`^(\d+(:|-)\d+|:\d+|\d+:|<\d+>|\d+) description=['"]?(.+)['"]?$`)
 	for _, line := range res {
 		matches := re.FindStringSubmatch(line)
 		if matches == nil {

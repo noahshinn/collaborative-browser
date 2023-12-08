@@ -57,12 +57,12 @@ func (b *Browser) updateDisplay() error {
 		return fmt.Errorf("error getting location: %w", err)
 	} else if html, err := b.getHTML(); err != nil {
 		return fmt.Errorf("error getting html for location %s: %w", location, err)
+	} else if md, err := b.translators[language.LanguageMD].Translate(html); err != nil {
+		return fmt.Errorf("error translating html to %s for location %s: %w", language.LanguageMD, location, err)
 	} else {
 		b.display.HTML = html
 		b.display.Location = location
-		if b.display.MD == "" {
-			b.display.MD = "No MD display available yet."
-		}
+		b.display.MD = md
 		return nil
 	}
 }

@@ -11,8 +11,8 @@ import (
 type AfforderStrategyID string
 
 const (
-	AfforderStrategyIDFunctionAfforder AfforderStrategyID = "function_afforder"
-	AfforderStrategyIDFilterAfforder   AfforderStrategyID = "filter_afforder"
+	AfforderStrategyIDFunctionAfforder AfforderStrategyID = "function"
+	AfforderStrategyIDFilterAfforder   AfforderStrategyID = "filter"
 )
 
 const DefaultAfforderStrategyID = AfforderStrategyIDFunctionAfforder
