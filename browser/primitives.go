@@ -2,6 +2,7 @@ package browser
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/chromedp/chromedp"
 )
@@ -119,5 +120,44 @@ doesSupportAriaLabels();
 		return false, fmt.Errorf("error checking if browser supports aria labels: %w", err)
 	} else {
 		return supportsAriaLabels, nil
+	}
+}
+
+const pageLoadWaitTimeoutMs = 10000
+
+func (b *Browser) waitForPageLoad() {
+	js := fmt.Sprintf(`function waitForPageLoad(timeoutMs) {
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			reject(new Error('Timeout waiting for page load'));
+		}, timeoutMs);
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', () => {
+				clearTimeout(timeout);
+				resolve();
+			})
+		} else {
+			clearTimeout(timeout);
+			resolve();
+		}
+	});
+	}
+}
+waitForPageLoad(%d);`, pageLoadWaitTimeoutMs)
+	if err := b.run(chromedp.Evaluate(js, nil)); err != nil {
+		log.Printf("Error waiting for page load: %v", err)
+	}
+}
+
+func (b *Browser) isPageLoaded() (bool, error) {
+	js := `function isPageLoaded() {
+	return document.readyState !== 'loading';
+}
+isPageLoaded();`
+	var isLoaded bool
+	if err := b.run(chromedp.Evaluate(js, &isLoaded)); err != nil {
+		return false, fmt.Errorf("error checking if page is loaded: %w", err)
+	} else {
+		return isLoaded, nil
 	}
 }

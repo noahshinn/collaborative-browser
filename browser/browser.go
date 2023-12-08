@@ -13,7 +13,6 @@ import (
 	"log"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/chromedp"
@@ -70,14 +69,13 @@ func (b *Browser) updateDisplay() error {
 
 func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error) {
 	var err error
+	var response string
 	switch action.Type {
 	case trajectory.BrowserActionTypeClick:
 		if err = b.Click(action.ID); err != nil {
 			return "", fmt.Errorf("error clicking: %w", err)
-		} else if err = b.updateDisplay(); err != nil {
-			return "", fmt.Errorf("error updating display: %w", err)
 		}
-		return fmt.Sprintf("clicked %s", action.ID), nil
+		response = fmt.Sprintf("clicked %s", action.ID)
 	case trajectory.BrowserActionTypeSendKeys:
 		if err = b.SendKeys(action.ID, action.Text); err != nil {
 			return "", fmt.Errorf("error sending keys: %w", err)
@@ -86,17 +84,19 @@ func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error)
 		if len(keysDisplay) > 10 {
 			keysDisplay = keysDisplay[:10] + "..."
 		}
-		return fmt.Sprintf("sent keys \"%s\" to %s", keysDisplay, action.ID), nil
+		response = fmt.Sprintf("sent keys \"%s\" to %s", keysDisplay, action.ID)
 	case trajectory.BrowserActionTypeNavigate:
 		if err = b.Navigate(action.URL); err != nil {
 			return "", fmt.Errorf("error navigating: %w", err)
-		} else if err = b.updateDisplay(); err != nil {
-			return "", fmt.Errorf("error updating display: %w", err)
 		}
-		return fmt.Sprintf("navigated to %s", action.URL), nil
+		response = fmt.Sprintf("navigated to %s", action.URL)
 	default:
 		return "", fmt.Errorf("unsupported browser action type: %s", action.Type)
 	}
+	if err := b.updateDisplay(); err != nil {
+		return "", fmt.Errorf("error updating display: %w", err)
+	}
+	return response, nil
 }
 
 func (b *Browser) run(actions ...chromedp.Action) error {
@@ -119,13 +119,20 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 		return fmt.Errorf("cannot click element type %s", elementType)
 	} else if err := b.ClickByVirtualID(string(id)); err != nil {
 		return fmt.Errorf("error clicking by virtual id: %w", err)
-	} else if err := b.updateDisplay(); err != nil {
+	}
+	if loaded, err := b.isPageLoaded(); err != nil {
+		log.Println("error checking if page is loaded:", err)
+	} else if !loaded {
+		b.waitForPageLoad()
+	}
+	if err := b.updateDisplay(); err != nil {
 		return fmt.Errorf("error updating display: %w", err)
-	} else if previousLocation != b.display.Location {
+	}
+	if previousLocation != b.display.Location {
 		if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
 			log.Println("error checking if browser supports aria labels:", err)
 		} else if !supportsAriaLabels {
-			log.Println("warning: browser does not support aria labels")
+			log.Println("warning: this page does not support aria labels")
 		}
 	}
 	return nil
@@ -144,24 +151,41 @@ func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
 		return fmt.Errorf("error checking element type for virtual id: %w", err)
 	} else if elementType != ElementTypeInput && elementType != ElementTypeTextArea {
 		return fmt.Errorf("cannot send keys to element type %s", elementType)
-	} else {
-		return b.SendTextByVirtualID(string(id), keys)
+	} else if err := b.SendTextByVirtualID(string(id), keys); err != nil {
+		return fmt.Errorf("error sending text by virtual id: %w", err)
 	}
+	if loaded, err := b.isPageLoaded(); err != nil {
+		log.Println("error checking if page is loaded:", err)
+	} else if !loaded {
+		b.waitForPageLoad()
+	}
+	return b.updateDisplay()
 }
 
 func (b *Browser) Navigate(URL string) error {
-	if u, err := GetCanonicalURL(URL); err != nil {
+	u, err := GetCanonicalURL(URL)
+	if err != nil {
 		return fmt.Errorf("error ensuring scheme: %w", err)
-	} else if valid, err := IsValidURL(u); !valid {
+	}
+	valid, err := IsValidURL(u)
+	if !valid {
 		return fmt.Errorf("invalid url %s: %w", u, err)
-	} else if err := b.run(chromedp.Navigate(u), chromedp.Sleep(1*time.Second)); err != nil {
+	}
+	err = b.run(chromedp.Navigate(u))
+	if err != nil {
 		return fmt.Errorf("error navigating to %s: %w", u, err)
-	} else if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
+	}
+	if loaded, err := b.isPageLoaded(); err != nil {
+		log.Println("error checking if page is loaded:", err)
+	} else if !loaded {
+		b.waitForPageLoad()
+	}
+	if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
 		log.Println("error checking if browser supports aria labels:", err)
 	} else if !supportsAriaLabels {
-		log.Println("warning: browser does not support aria labels")
+		log.Println("warning: this page does not support aria labels")
 	}
-	return nil
+	return b.updateDisplay()
 }
 
 func (b *Browser) addVirtualIDs() error {
