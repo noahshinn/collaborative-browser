@@ -10,6 +10,7 @@ type Runner interface {
 	AddItemToTrajectory(item trajectory.TrajectoryItem)
 	DisplayTrajectory()
 	RunHeadful() error
+	RunHeadless() error
 	Log() error
 	Terminate()
 }

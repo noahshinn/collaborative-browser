@@ -291,6 +291,25 @@ func (b *Browser) RunHeadful(ctx context.Context) error {
 	return nil
 }
 
+func (b *Browser) RunHeadless(ctx context.Context) error {
+	if b.isRunningHeadless {
+		log.Println("requested to run the browser in headless mode but this browser is already running in headless mode")
+		return nil
+	}
+	log.Println("running the browser in headless mode; warning: you will lose all non-location state from the current browser")
+	newOps := slicesx.Filter(b.options, func(option BrowserOption, _ int) bool {
+		return option != BrowserOptionHeadful
+	})
+	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	b.ctx = newBrowserCtx
+	b.cancel = newBrowserCancelFunc
+	if err := b.Navigate(b.display.Location); err != nil {
+		return fmt.Errorf("error navigating to current location %s: %w", b.display.Location, err)
+	}
+	b.isRunningHeadless = true
+	return nil
+}
+
 func buildOptions(options ...BrowserOption) []func(*chromedp.ExecAllocator) {
 	ops := chromedp.DefaultExecAllocatorOptions[:]
 	for _, option := range options {

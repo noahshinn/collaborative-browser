@@ -204,6 +204,10 @@ func (r *FiniteRunner) RunHeadful() error {
 	return r.browser.RunHeadful(r.ctx)
 }
 
+func (r *FiniteRunner) RunHeadless() error {
+	return r.browser.RunHeadless(r.ctx)
+}
+
 func (r *FiniteRunner) Terminate() {
 	r.browser.Cancel()
 }
