@@ -282,6 +282,7 @@ func (b *Browser) RunHeadful(ctx context.Context) error {
 	log.Println("running the browser in headful mode; warning: you will lose all non-location state from the current browser")
 	newOps := append(b.options, BrowserOptionHeadful)
 	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	b.cancel()
 	b.ctx = newBrowserCtx
 	b.cancel = newBrowserCancelFunc
 	if err := b.Navigate(b.display.Location); err != nil {
@@ -301,6 +302,7 @@ func (b *Browser) RunHeadless(ctx context.Context) error {
 		return option != BrowserOptionHeadful
 	})
 	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	b.cancel()
 	b.ctx = newBrowserCtx
 	b.cancel = newBrowserCancelFunc
 	if err := b.Navigate(b.display.Location); err != nil {
