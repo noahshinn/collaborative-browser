@@ -7,8 +7,8 @@ import (
 type Runner interface {
 	Run() error
 	RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error)
-	AddItemToTrajectory(item trajectory.TrajectoryItem)
-	DisplayTrajectory()
+	AddItemToTrajectory(item trajectory.TrajectoryItem) error
+	DisplayTrajectory() error
 	RunHeadful() error
 	RunHeadless() error
 	Log() error

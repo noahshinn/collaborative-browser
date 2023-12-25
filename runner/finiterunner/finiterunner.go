@@ -7,6 +7,7 @@ import (
 	"collaborativebrowser/browser"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/runner"
+	"collaborativebrowser/runner/sharedlocalstorage"
 	"collaborativebrowser/trajectory"
 	"collaborativebrowser/utils/io"
 	"collaborativebrowser/utils/printx"
@@ -20,12 +21,12 @@ import (
 )
 
 type FiniteRunner struct {
-	ctx         context.Context
-	actor       actorstrategy.ActorStrategy
-	browser     *browser.Browser
-	maxNumSteps int
-	trajectory  *trajectory.Trajectory
-	logPath     string
+	ctx                context.Context
+	actor              actorstrategy.ActorStrategy
+	browser            *browser.Browser
+	maxNumSteps        int
+	logPath            string
+	sharedLocalStorage *sharedlocalstorage.SharedLocalStorage
 }
 
 const DefaultMaxNumSteps = 5
@@ -68,6 +69,11 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 	} else if openaiApiKey, ok := apiKeys["OPENAI_API_KEY"]; !ok {
 		return nil, fmt.Errorf("api keys must contain OPENAI_API_KEY") // for now
 	} else {
+		b := browser.NewBrowser(ctx, browserOptions...)
+		sls := sharedlocalstorage.NewSharedLocalStorage(ctx, nil)
+		if err := sls.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start shared local storage: %w", err)
+		}
 		userMessage := trajectory.NewMessage(trajectory.MessageAuthorUser, fmt.Sprintf("Please go to %s", url))
 		allModels := llm.AllModels(openaiApiKey)
 		actor, err := actor.ActorStrategyByIDWithOptions(actorStrategyID, allModels, &actor.Options{
@@ -76,30 +82,30 @@ func NewFiniteRunnerFromInitialPage(ctx context.Context, url string, apiKeys map
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize actor: %w", err)
 		}
-		browser := browser.NewBrowser(ctx, browserOptions...)
 		initialAction := trajectory.NewBrowserNavigateAction(url)
-		observation, err := browser.AcceptAction(initialAction.(*trajectory.BrowserAction))
+		observation, err := b.AcceptAction(initialAction.(*trajectory.BrowserAction))
 		if err != nil {
 			return nil, fmt.Errorf("browser failed to accept initial action: %w", err)
 		}
 		initialObservation := trajectory.NewBrowserObservation(observation)
-		trajectory := &trajectory.Trajectory{
-			Items: []trajectory.TrajectoryItem{
-				userMessage,
-				initialAction,
-				initialObservation,
-			},
+		r := &FiniteRunner{
+			ctx:                ctx,
+			actor:              actor,
+			browser:            b,
+			maxNumSteps:        maxNumSteps,
+			logPath:            logPath,
+			sharedLocalStorage: sls,
+		}
+		if err := r.sharedTrajectoryAddItems([]trajectory.TrajectoryItem{
+			userMessage,
+			initialAction,
+			initialObservation,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to add items to shared trajectory: %w", err)
 		}
 		printx.PrintStandardHeader("CONFIGURATION")
 		fmt.Printf("\nInitializing a finite runner with the following configuration:\n- Maximum number steps per turn: %d\n- Actor strategy: %s\n- Log path: %s\n", maxNumSteps, actorStrategyID, logPath)
-		return &FiniteRunner{
-			ctx:         ctx,
-			actor:       actor,
-			browser:     browser,
-			maxNumSteps: maxNumSteps,
-			trajectory:  trajectory,
-			logPath:     logPath,
-		}, nil
+		return r, nil
 	}
 }
 
@@ -109,33 +115,39 @@ func (r *FiniteRunner) Run() error {
 		if err != nil {
 			return err
 		}
-		r.trajectory.AddItem(nextAction)
+		if err := r.sharedTrajectoryAddItem(nextAction); err != nil {
+			return err
+		}
 		if nextAction.ShouldHandoff() {
 			return nil
 		}
 		if observation, err := r.browser.AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
 			return err
-		} else {
-			browserDisplay := r.browser.GetDisplay()
-			r.trajectory.AddItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
-			r.trajectory.AddItem(trajectory.NewBrowserObservation(observation))
+		} else if err := r.sharedTrajectoryAddItem(trajectory.NewBrowserObservation(observation)); err != nil {
+			return err
 		}
 	}
-	r.trajectory.AddItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
-	return nil
+	return r.sharedTrajectoryAddItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
 }
 
 func (r *FiniteRunner) runStep() (nextAction trajectory.TrajectoryItem, err error) {
-	return r.actor.NextAction(r.ctx, r.trajectory, r.browser)
+	traj, err := r.sharedTrajectoryRead()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read shared trajectory: %w", err)
+	}
+	return r.actor.NextAction(r.ctx, traj, r.browser)
 }
 
 func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent, error) {
 	stream := make(chan *trajectory.TrajectoryStreamEvent)
-	addAndSendTrajectoryItem := func(item trajectory.TrajectoryItem) {
-		r.trajectory.AddItem(item)
+	addAndSendTrajectoryItem := func(item trajectory.TrajectoryItem) error {
+		if err := r.sharedTrajectoryAddItem(item); err != nil {
+			return err
+		}
 		stream <- &trajectory.TrajectoryStreamEvent{
 			TrajectoryItem: item,
 		}
+		return nil
 	}
 	sendErrorTrajectoryItem := func(err error) {
 		stream <- &trajectory.TrajectoryStreamEvent{
@@ -157,25 +169,32 @@ func (r *FiniteRunner) RunAndStream() (<-chan *trajectory.TrajectoryStreamEvent,
 			if observation, err := r.browser.AcceptAction(nextAction.(*trajectory.BrowserAction)); err != nil {
 				sendErrorTrajectoryItem(err)
 				return
-			} else {
-				browserDisplay := r.browser.GetDisplay()
-				addAndSendTrajectoryItem(trajectory.NewDebugRenderedDisplay(trajectory.DebugDisplayTypeBrowser, browserDisplay.MD))
-				addAndSendTrajectoryItem(trajectory.NewBrowserObservation(observation))
+			} else if err := addAndSendTrajectoryItem(trajectory.NewBrowserObservation(observation)); err != nil {
+				sendErrorTrajectoryItem(err)
+				return
 			}
 		}
-		addAndSendTrajectoryItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps))
+		if err := addAndSendTrajectoryItem(trajectory.NewErrorMaxNumStepsReached(r.maxNumSteps)); err != nil {
+			sendErrorTrajectoryItem(err)
+			return
+		}
 	}()
 	return stream, nil
 }
 
-func (r *FiniteRunner) AddItemToTrajectory(item trajectory.TrajectoryItem) {
-	r.trajectory.AddItem(item)
+func (r *FiniteRunner) AddItemToTrajectory(item trajectory.TrajectoryItem) error {
+	return r.sharedTrajectoryAddItem(item)
 }
 
-func (r *FiniteRunner) DisplayTrajectory() {
-	for _, item := range r.trajectory.Items {
+func (r *FiniteRunner) DisplayTrajectory() error {
+	traj, err := r.sharedTrajectoryRead()
+	if err != nil {
+		return fmt.Errorf("failed to read shared trajectory: %w", err)
+	}
+	for _, item := range traj.Items {
 		fmt.Println(item.GetAbbreviatedText())
 	}
+	return nil
 }
 
 func (r *FiniteRunner) Log() error {
@@ -184,8 +203,12 @@ func (r *FiniteRunner) Log() error {
 			return fmt.Errorf("failed to create log directory: %w", err)
 		}
 	}
-	trajectoryTextItems := make([]string, len(r.trajectory.Items))
-	for i, item := range r.trajectory.Items {
+	traj, err := r.sharedTrajectoryRead()
+	if err != nil {
+		return fmt.Errorf("failed to read shared trajectory: %w", err)
+	}
+	trajectoryTextItems := make([]string, len(traj.Items))
+	for i, item := range traj.Items {
 		trajectoryTextItems[i] = item.GetAbbreviatedText()
 	}
 	browserDisplay := r.browser.GetDisplay()
@@ -210,4 +233,5 @@ func (r *FiniteRunner) RunHeadless() error {
 
 func (r *FiniteRunner) Terminate() {
 	r.browser.Cancel()
+	r.sharedLocalStorage.Stop()
 }

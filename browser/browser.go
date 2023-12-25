@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"collaborativebrowser/browser/js/primitives"
 	"collaborativebrowser/browser/language"
 	"collaborativebrowser/browser/virtualid"
 	"collaborativebrowser/trajectory"
@@ -52,6 +53,8 @@ const (
 	ElementTypeOther    ElementType = "other"
 )
 
+const pageLoadWaitTimeoutMs = 10000
+
 func (b *Browser) updateDisplay() error {
 	if location, err := b.getLocation(); err != nil {
 		return fmt.Errorf("error getting location: %w", err)
@@ -76,6 +79,10 @@ func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error)
 			return "", fmt.Errorf("error clicking: %w", err)
 		}
 		response = fmt.Sprintf("clicked %s", action.ID)
+		// REMOVE
+		if err := b.run(primitives.LocalStorageWrite("last-clicked", fmt.Sprintf(`{"id": "%s"}`, action.ID))); err != nil {
+			return "", fmt.Errorf("error writing to local storage: %w", err)
+		}
 	case trajectory.BrowserActionTypeSendKeys:
 		if err = b.SendKeys(action.ID, action.Text); err != nil {
 			return "", fmt.Errorf("error sending keys: %w", err)
@@ -123,7 +130,7 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 	if loaded, err := b.isPageLoaded(); err != nil {
 		log.Println("error checking if page is loaded:", err)
 	} else if !loaded {
-		b.waitForPageLoad()
+		primitives.WaitForPageLoad(pageLoadWaitTimeoutMs)
 	}
 	if err := b.updateDisplay(); err != nil {
 		return fmt.Errorf("error updating display: %w", err)
@@ -157,7 +164,7 @@ func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
 	if loaded, err := b.isPageLoaded(); err != nil {
 		log.Println("error checking if page is loaded:", err)
 	} else if !loaded {
-		b.waitForPageLoad()
+		primitives.WaitForPageLoad(pageLoadWaitTimeoutMs)
 	}
 	return b.updateDisplay()
 }
@@ -178,7 +185,7 @@ func (b *Browser) Navigate(URL string) error {
 	if loaded, err := b.isPageLoaded(); err != nil {
 		log.Println("error checking if page is loaded:", err)
 	} else if !loaded {
-		b.waitForPageLoad()
+		primitives.WaitForPageLoad(pageLoadWaitTimeoutMs)
 	}
 	if supportsAriaLabels, err := b.DoesSupportAriaLabels(); err != nil {
 		log.Println("error checking if browser supports aria labels:", err)
@@ -292,6 +299,100 @@ func (b *Browser) RunHeadful(ctx context.Context) error {
 	return nil
 }
 
+func (b *Browser) DoesVirtualIDExist(virtualID string) (bool, error) {
+	var exists bool
+	if err := b.run(chromedp.Evaluate(fmt.Sprintf("document.querySelector('[data-vid=\"%s\"]') !== null", virtualID), &exists)); err != nil {
+		return false, err
+	} else {
+		return exists, nil
+	}
+}
+
+func (b *Browser) ClickByVirtualID(virtualID string) error {
+	return b.run(primitives.ClickByQuerySelector(fmt.Sprintf("[data-vid=\"%s\"]", virtualID)))
+}
+
+func (b *Browser) SendTextByVirtualID(virtualID string, text string) error {
+	return b.run(primitives.SendTextByQuerySelector(fmt.Sprintf("[data-vid=\"%s\"]", virtualID), text))
+}
+
+func (b *Browser) CheckElementTypeForQuerySelector(query string) (ElementType, error) {
+	js := fmt.Sprintf(`function checkElementTypeForQuerySelector(query) {
+	const element = document.querySelector(query);
+	if (element) {
+		if (element.tagName === 'INPUT') {
+			return 'input';
+		} else if (element.tagName === 'TEXTAREA') {
+			return 'textarea';
+		} else if (element.tagName === 'BUTTON') {
+			return 'button';
+		} else if (element.tagName === 'A') {
+			return 'a';
+		} else {
+			return 'other';
+		}
+	} else {
+		throw new Error("element not found");
+	}
+}
+checkElementTypeForQuerySelector('%s');`, query)
+	var elementType string
+	if err := b.run(chromedp.Evaluate(js, &elementType)); err != nil {
+		return "", fmt.Errorf("error checking element type for query selector: %w", err)
+	} else {
+		return ElementType(elementType), nil
+	}
+}
+
+func (b *Browser) CheckElementTypeForVirtualID(virtualID string) (ElementType, error) {
+	return b.CheckElementTypeForQuerySelector(fmt.Sprintf("[data-vid=\"%s\"]", virtualID))
+}
+
+func (b *Browser) GetAllVisibleVirtualIDs() ([]string, error) {
+	js := `function getAllVisibleVirtualIDs() {
+	const elements = document.querySelectorAll('[data-vid]');
+	const dataVids = Array.from(elements).map(element => element.getAttribute('data-vid'));
+	return dataVids;
+}
+getAllVisibleVirtualIDs();`
+	var virtualIDs []string
+	if err := b.run(chromedp.Evaluate(js, &virtualIDs)); err != nil {
+		return nil, fmt.Errorf("error getting all visible virtual IDs: %w", err)
+	} else if virtualIDs == nil {
+		return nil, fmt.Errorf("error getting all visible virtual IDs: virtual IDs is nil")
+	} else {
+		return virtualIDs, nil
+	}
+}
+
+func (b *Browser) DoesSupportAriaLabels() (bool, error) {
+	js := `function doesSupportAriaLabels() {
+	const ariaLabelElems = document.querySelectorAll('[aria-label]');
+	return ariaLabelElems.length > 0;
+}
+doesSupportAriaLabels();
+`
+	var supportsAriaLabels bool
+	if err := b.run(chromedp.Evaluate(js, &supportsAriaLabels)); err != nil {
+		return false, fmt.Errorf("error checking if browser supports aria labels: %w", err)
+	} else {
+		return supportsAriaLabels, nil
+	}
+}
+
+func (b *Browser) isPageLoaded() (bool, error) {
+	js := `function isPageLoaded() {
+	return document.readyState !== 'loading';
+}
+isPageLoaded();`
+	var isLoaded bool
+	if err := b.run(chromedp.Evaluate(js, &isLoaded)); err != nil {
+		return false, fmt.Errorf("error checking if page is loaded: %w", err)
+	} else {
+		return isLoaded, nil
+	}
+}
+
 func (b *Browser) RunHeadless(ctx context.Context) error {
 	if b.isRunningHeadless {
 		log.Println("requested to run the browser in headless mode but this browser is already running in headless mode")
@@ -342,7 +443,7 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		language.LanguageMD: htmlToMDTranslator,
 	}
 	browserCtx, cancel := newBrowser(ctx, options...)
-	return &Browser{
+	b := Browser{
 		mu:                &sync.Mutex{},
 		ctx:               browserCtx,
 		cancel:            cancel,
@@ -352,4 +453,5 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		display:           &BrowserDisplay{},
 		isRunningHeadless: isRunningHeadless,
 	}
+	return &b
 }
