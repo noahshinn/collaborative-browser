@@ -76,10 +76,19 @@ ScannerLoop:
 			fmt.Print("user: ")
 			continue ScannerLoop
 		case "headful":
-			printx.PrintInColor(printx.ColorGray, "Running browser in headful mode...")
+			printx.PrintInColor(printx.ColorGray, "Prepping browser to run in headful mode...")
 			if err := runner.RunHeadful(); err != nil {
 				printx.PrintInColor(printx.ColorYellow, fmt.Sprintf("Failed to run browser in headful mode: %s, continuing in headless mode", err.Error()))
 			}
+			printx.PrintInColor(printx.ColorGray, "Running browser in headful mode.")
+			fmt.Print("user: ")
+			continue ScannerLoop
+		case "headless":
+			printx.PrintInColor(printx.ColorGray, "Prepping browser to run in headless mode...")
+			if err := runner.RunHeadless(); err != nil {
+				printx.PrintInColor(printx.ColorYellow, fmt.Sprintf("Failed to run browser in headless mode: %s, continuing in headful mode", err.Error()))
+			}
+			printx.PrintInColor(printx.ColorGray, "Running browser in headless mode.")
 			fmt.Print("user: ")
 			continue ScannerLoop
 		case "exit":
