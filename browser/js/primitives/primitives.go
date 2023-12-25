@@ -73,7 +73,7 @@ waitForPageLoad(%d);`, ms)
 
 func LocalStorageWrite(key string, valueJsonString string) chromedp.Action {
 	js := fmt.Sprintf(`async function localStorageWrite(key, value) {
-	const response = await fetch("http://localhost:8080/api-sls", {
+	const response = await fetch("http://localhost:2334/api-sls", {
 		method: "POST",
 		body: JSON.stringify({
 			key: key,
@@ -86,5 +86,57 @@ func LocalStorageWrite(key string, valueJsonString string) chromedp.Action {
 }
 localStorageWrite('%s', '%s')
 	.then(() => console.log("completed"));`, key, valueJsonString)
+	return chromedp.Evaluate(js, nil)
+}
+
+func AddClickEventHandler() chromedp.Action {
+	return AddEventHandler("click", `async (event) => {
+	const response = fetch("http://localhost:2334/api-sls/traj", {
+		method: "POST",
+		body: JSON.stringify({
+			key: "click",
+}`)
+}
+
+func AddEventHandler(eventType string, jsCallback string) chromedp.Action {
+	js := fmt.Sprintf(`function addEventHandler(eventType, jsCallback) {
+	document.addEventListener(eventType, jsCallback);
+}
+addEventHandler('%s', %s);`, eventType, jsCallback)
+	return chromedp.Evaluate(js, nil)
+}
+
+func InitializeGlobalStore() chromedp.Action {
+	js := `function initializeGlobalStore() {
+	globalThis.collaborativeBrowserStore = {};
+}
+initializeGlobalStore();`
+	return chromedp.Evaluate(js, nil)
+}
+
+func ReadGlobalVar(key string) chromedp.Action {
+	js := fmt.Sprintf(`function readGlobalVar(key) {
+	const collaborativeBrowserStore = globalThis.collaborativeBrowserStore;
+	if (collaborativeBrowserStore === undefined) {
+		throw new Error("collaborativeBrowserStore is undefined; must initialize it first");
+	}
+	if (collaborativeBrowserStore[key] === undefined) {
+		throw new Error("key not found");
+	}
+	return collaborativeBrowserStore[key];
+}
+readGlobalVar('%s');`, key)
+	return chromedp.Evaluate(js, nil)
+}
+
+func WriteGlobalVar(key string, value string) chromedp.Action {
+	js := fmt.Sprintf(`function addGlobalVar(key, value) {
+	const collaborativeBrowserStore = globalThis.collaborativeBrowserStore;
+	if (collaborativeBrowserStore === undefined) {
+		throw new Error("collaborativeBrowserStore is undefined; must initialize it first");
+	}
+	collaborativeBrowserStore[key] = value;
+}
+addGlobalVar('%s', '%s');`, key, value)
 	return chromedp.Evaluate(js, nil)
 }

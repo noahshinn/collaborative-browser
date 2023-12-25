@@ -29,7 +29,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 	}
 }
 
-func (ra *ReactActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
+func (ra *ReactActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (*trajectory.TrajectoryItem, error) {
 	// TODO: implement
 	return nil, nil
 }

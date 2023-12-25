@@ -23,6 +23,7 @@ func main() {
 	initialURL := flag.String("url", "https://www.google.com", "the initial url to visit")
 	actorStrategy := flag.String("actor-strategy", "base", "the actor strategy to use; one of [\"base\", \"reflexion\"]")
 	afforderStrategy := flag.String("afforder-strategy", "function", "the afforder strategy to use; one of [\"function\", filter\"]")
+	localStorageServerPort := flag.Int("local-storage-server-port", 2334, "the port to run the local storage server on")
 	verbose := flag.Bool("verbose", false, "whether to print verbose debug logs")
 	flag.Parse()
 
@@ -31,11 +32,14 @@ func main() {
 		log.SetOutput(io.Discard)
 	}
 
-	browserOptions := []browser.BrowserOption{
-		browser.BrowserOptionAttemptToDisableAutomationMessage,
+	browserOptions := &browser.Options{
+		AttemptToDisableAutomationMessage: true,
 	}
 	if *runHeadful {
-		browserOptions = append(browserOptions, browser.BrowserOptionHeadful)
+		browserOptions.RunHeadful = true
+	}
+	if *localStorageServerPort > 0 {
+		browserOptions.LocalStorageServerPort = *localStorageServerPort
 	}
 
 	openaiAPIKey := os.Getenv("OPENAI_API_KEY")
@@ -114,8 +118,8 @@ ScannerLoop:
 				if event.Error != nil {
 					panic(fmt.Errorf("error in stream: %w", event.Error))
 				}
-				if event.TrajectoryItem.ShouldRender() {
-					if _, ok := event.TrajectoryItem.(*trajectory.Message); ok {
+				if event.TrajectoryItem.ShouldRender {
+					if event.TrajectoryItem.Type == trajectory.TrajectoryItemMessage {
 						fmt.Println(event.TrajectoryItem.GetText())
 					} else {
 						fmt.Println(event.TrajectoryItem.GetAbbreviatedText())

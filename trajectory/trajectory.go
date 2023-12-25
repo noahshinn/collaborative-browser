@@ -5,7 +5,7 @@ import (
 )
 
 type Trajectory struct {
-	Items []TrajectoryItem
+	Items []*TrajectoryItem
 }
 
 func (t *Trajectory) GetText() string {
@@ -14,7 +14,7 @@ func (t *Trajectory) GetText() string {
 	}
 	itemTexts := []string{}
 	for _, item := range t.Items {
-		if item.ShouldRender() {
+		if item.ShouldRender {
 			itemTexts = append(itemTexts, item.GetText())
 		}
 	}
@@ -27,8 +27,8 @@ func (t *Trajectory) GetAbbreviatedText() string {
 	}
 	itemTexts := []string{}
 	for _, item := range t.Items {
-		if item.ShouldRender() {
-			if _, ok := item.(*Message); ok {
+		if item.ShouldRender {
+			if item.Type == TrajectoryItemMessage {
 				itemTexts = append(itemTexts, item.GetText())
 			} else {
 				itemTexts = append(itemTexts, item.GetAbbreviatedText())
@@ -38,54 +38,49 @@ func (t *Trajectory) GetAbbreviatedText() string {
 	return strings.Join(itemTexts, "\n")
 }
 
-func (t *Trajectory) AddItem(item TrajectoryItem) {
-	t.Items = append(t.Items, item)
+type TrajectoryItem struct {
+	Type          TrajectoryItemType `json:"type"`
+	ShouldHandoff bool               `json:"should_handoff"`
+	ShouldRender  bool               `json:"should_render"`
+
+	// for `click`, `send_keys`
+	ID string `json:"id"`
+
+	// for `navigate`
+	URL string `json:"url"`
+
+	// for `send_keys` and `message`
+	Text string `json:"text"`
+
+	// for `task_complete`, `task_not_possible`
+	Reason string `json:"reason"`
+
+	// for `max_num_steps_reached`
+	MaxNumSteps int `json:"max_num_steps"`
+
+	// for `max_context_length_exceeded`
+	ContextLengthAllowed  int `json:"context_length_allowed"`
+	ContextLengthReceived int `json:"context_length_received"`
+
+	// for `message`
+	Author MessageAuthor `json:"author"`
 }
 
-func (t *Trajectory) AddItems(items []TrajectoryItem) {
-	t.Items = append(t.Items, items...)
-}
+type TrajectoryItemType string
 
-type TrajectoryItem interface {
-	GetAbbreviatedText() string
-	GetText() string
-	ShouldHandoff() bool
-	ShouldRender() bool
-	IsMessage() bool
-}
+const (
+	TrajectoryItemMessage                  TrajectoryItemType = "message"
+	TrajectoryItemObservation              TrajectoryItemType = "browser_observation"
+	TrajectoryItemMaxNumStepsReached       TrajectoryItemType = "max_num_steps_reached"
+	TrajectoryItemMaxContextLengthExceeded TrajectoryItemType = "max_context_length_exceeded"
+	TrajectoryItemClick                    TrajectoryItemType = "click"
+	TrajectoryItemSendKeys                 TrajectoryItemType = "send_keys"
+	TrajectoryItemNavigate                 TrajectoryItemType = "navigate"
+	TrajectoryItemTaskComplete             TrajectoryItemType = "task_complete"
+	TrajectoryItemTaskNotPossible          TrajectoryItemType = "task_not_possible"
+)
 
 type TrajectoryStreamEvent struct {
-	TrajectoryItem TrajectoryItem
+	TrajectoryItem *TrajectoryItem
 	Error          error
-}
-
-type Handoff struct{}
-type DontHandoff struct{}
-type Render struct{}
-type DontRender struct{}
-type ItemIsMessage struct{}
-type ItemIsNotMessage struct{}
-
-func (h Handoff) ShouldHandoff() bool {
-	return true
-}
-
-func (d DontHandoff) ShouldHandoff() bool {
-	return false
-}
-
-func (r Render) ShouldRender() bool {
-	return true
-}
-
-func (d DontRender) ShouldRender() bool {
-	return false
-}
-
-func (i ItemIsMessage) IsMessage() bool {
-	return true
-}
-
-func (i ItemIsNotMessage) IsMessage() bool {
-	return false
 }

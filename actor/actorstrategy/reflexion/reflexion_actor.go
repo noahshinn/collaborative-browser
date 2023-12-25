@@ -46,25 +46,25 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 	}
 }
 
-func (a *ReflexionActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
+func (a *ReflexionActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (*trajectory.TrajectoryItem, error) {
 	_, actionSpace, err := a.afforder.GetAffordances(ctx, traj, br)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get affordances: %w", err)
 	}
-	var prevInferredAction trajectory.TrajectoryItem
+	var prevInferredAction *trajectory.TrajectoryItem
 	localTraj := trajectory.Trajectory{
-		Items: make([]trajectory.TrajectoryItem, len(traj.Items)),
+		Items: make([]*trajectory.TrajectoryItem, len(traj.Items)),
 	}
 	copy(localTraj.Items, traj.Items)
 	for i := 0; i < a.maxNumIterations; i++ {
 		nextAction, err := a.baseActorStrategy.NextAction(ctx, &localTraj, br)
 		if prevInferredAction != nil {
 			// If there are two consecutive messages, then we assume that the second message is the correct action to take.
-			if prevInferredAction.IsMessage() && nextAction.IsMessage() {
+			if prevInferredAction.Type == trajectory.TrajectoryItemMessage && nextAction.Type == trajectory.TrajectoryItemMessage {
 				return nextAction, nil
 			}
 			// If there are two consecutive actions with the same name and arguments, then we assume that the second action is the correct action to take.
-			if !prevInferredAction.IsMessage() && !nextAction.IsMessage() && prevInferredAction.GetText() == nextAction.GetText() {
+			if prevInferredAction.Type != trajectory.TrajectoryItemMessage && nextAction.Type != trajectory.TrajectoryItemMessage && prevInferredAction.GetText() == nextAction.GetText() {
 				return nextAction, nil
 			}
 		}
@@ -96,7 +96,7 @@ var reflectSystemPrompt string
 //go:embed truncated_browser_system_prompt.txt
 var truncatedBrowserSystemPrompt string
 
-func (a *ReflexionActor) reflect(ctx context.Context, traj *trajectory.Trajectory, nextAction trajectory.TrajectoryItem, actionSpace []*llm.FunctionDef) (validAction bool, reflection string, err error) {
+func (a *ReflexionActor) reflect(ctx context.Context, traj *trajectory.Trajectory, nextAction *trajectory.TrajectoryItem, actionSpace []*llm.FunctionDef) (validAction bool, reflection string, err error) {
 	trajectoryRender := traj.GetText()
 	b, err := json.MarshalIndent(actionSpace, "", "  ")
 	if err != nil {

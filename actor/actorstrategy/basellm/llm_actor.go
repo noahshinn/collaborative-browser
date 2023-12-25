@@ -30,7 +30,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 	}
 }
 
-func (a *BaseLLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
+func (a *BaseLLMActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (*trajectory.TrajectoryItem, error) {
 	messages, functionDefs, err := a.afforder.GetAffordances(ctx, traj, br)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get affordances: %w", err)

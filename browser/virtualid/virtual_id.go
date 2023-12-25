@@ -6,14 +6,12 @@ import (
 	"strings"
 )
 
-type VirtualID string
-
 const VirtualIDPrefix = "vid-"
 const VirtualIDDataAttr = "data-vid"
 
 type VirtualIDGenerator interface {
-	Generate() VirtualID
-	IsValidVirtualID(id VirtualID) bool
+	Generate() string
+	IsValidVirtualID(id string) bool
 }
 
 type IncrIntVirtualIDGenerator struct {
@@ -25,13 +23,13 @@ func NewIncrIntVirtualIDGenerator() VirtualIDGenerator {
 	return &IncrIntVirtualIDGenerator{Cur: 0}
 }
 
-func (g *IncrIntVirtualIDGenerator) Generate() VirtualID {
-	newID := VirtualID(fmt.Sprintf("%s%d", VirtualIDPrefix, g.Cur))
+func (g *IncrIntVirtualIDGenerator) Generate() string {
+	newID := fmt.Sprintf("%s%d", VirtualIDPrefix, g.Cur)
 	g.Cur++
 	return newID
 }
 
-func (g *IncrIntVirtualIDGenerator) IsValidVirtualID(id VirtualID) bool {
+func (g *IncrIntVirtualIDGenerator) IsValidVirtualID(id string) bool {
 	if !IsValidBaseVirtualID(id) {
 		return false
 	}
@@ -42,10 +40,10 @@ func (g *IncrIntVirtualIDGenerator) IsValidVirtualID(id VirtualID) bool {
 	return true
 }
 
-func IsValidBaseVirtualID(id VirtualID) bool {
+func IsValidBaseVirtualID(id string) bool {
 	return strings.HasPrefix(string(id), VirtualIDPrefix) && len(string(id)) > len(VirtualIDPrefix)
 }
 
-func VirtualIDElementQuery(id VirtualID) string {
+func VirtualIDElementQuery(id string) string {
 	return fmt.Sprintf(`[%s="%s"]`, VirtualIDDataAttr, id)
 }

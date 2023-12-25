@@ -1,132 +1,109 @@
 package trajectory
 
 import (
-	"collaborativebrowser/browser/virtualid"
 	"fmt"
 )
 
-type BrowserAction struct {
-	Type   BrowserActionType   `json:"type"`
-	ID     virtualid.VirtualID `json:"id"`
-	Render bool                `json:"render"`
-
-	// for send_keys
-	Text string `json:"text"`
-
-	// for navigate
-	URL string `json:"url"`
-
-	// for task_complete or task_not_possible
-	Reason string `json:"reason"`
-
-	ItemIsNotMessage
-}
-
-type BrowserActionType string
-
-const (
-	BrowserActionTypeClick           BrowserActionType = "click"
-	BrowserActionTypeSendKeys        BrowserActionType = "send_keys"
-	BrowserActionTypeNavigate        BrowserActionType = "navigate"
-	BrowserActionTypeTaskComplete    BrowserActionType = "task_complete"
-	BrowserActionTypeTaskNotPossible BrowserActionType = "task_not_possible"
-)
-
-func NewBrowserClickAction(id virtualid.VirtualID) TrajectoryItem {
-	return &BrowserAction{
-		Type:   BrowserActionTypeClick,
-		ID:     id,
-		Render: true,
+func NewBrowserClickAction(id string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemClick,
+		ID:            id,
+		ShouldRender:  true,
+		ShouldHandoff: false,
 	}
 }
 
-func NewBrowserSendKeysAction(id virtualid.VirtualID, text string) TrajectoryItem {
-	return &BrowserAction{
-		Type:   BrowserActionTypeSendKeys,
-		ID:     id,
-		Text:   text,
-		Render: true,
+func NewBrowserSendKeysAction(id string, text string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemSendKeys,
+		ID:            id,
+		Text:          text,
+		ShouldRender:  true,
+		ShouldHandoff: false,
 	}
 }
 
-func NewBrowserNavigateAction(url string) TrajectoryItem {
-	return &BrowserAction{
-		Type:   BrowserActionTypeNavigate,
-		URL:    url,
-		Render: true,
+func NewBrowserNavigateAction(url string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemNavigate,
+		URL:           url,
+		ShouldRender:  true,
+		ShouldHandoff: false,
 	}
 }
 
-func NewBrowserTaskCompleteAction(reason string) TrajectoryItem {
-	return &BrowserAction{
-		Type:   BrowserActionTypeTaskComplete,
-		Reason: reason,
-		Render: true,
+func NewBrowserTaskCompleteAction(reason string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemTaskComplete,
+		Reason:        reason,
+		ShouldRender:  true,
+		ShouldHandoff: false,
 	}
 }
 
-func NewBrowserTaskNotPossibleAction(reason string) TrajectoryItem {
-	return &BrowserAction{
-		Type:   BrowserActionTypeTaskNotPossible,
-		Reason: reason,
-		Render: true,
+func NewBrowserTaskNotPossibleAction(reason string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemTaskNotPossible,
+		Reason:        reason,
+		ShouldRender:  true,
+		ShouldHandoff: false,
 	}
 }
 
-func (ba *BrowserAction) GetText() string {
+func (ti *TrajectoryItem) GetText() string {
 	var text string
-	switch ba.Type {
-	case BrowserActionTypeClick:
-		text = fmt.Sprintf("%s(id=%s)", ba.Type, ba.ID)
-	case BrowserActionTypeSendKeys:
-		text = fmt.Sprintf("%s(id=%s, text=\"%s\")", ba.Type, ba.ID, ba.Text)
-	case BrowserActionTypeNavigate:
-		text = fmt.Sprintf("%s(url=\"%s\")", ba.Type, ba.URL)
-	case BrowserActionTypeTaskComplete:
-		text = fmt.Sprintf("%s(reason=\"%s\")", ba.Type, ba.Reason)
-	case BrowserActionTypeTaskNotPossible:
-		text = fmt.Sprintf("%s(reason=\"%s\")", ba.Type, ba.Reason)
+	switch ti.Type {
+	case TrajectoryItemClick:
+		text = fmt.Sprintf("%s(id=%s)", ti.Type, ti.ID)
+	case TrajectoryItemSendKeys:
+		text = fmt.Sprintf("%s(id=%s, text=\"%s\")", ti.Type, ti.ID, ti.Text)
+	case TrajectoryItemNavigate:
+		text = fmt.Sprintf("%s(url=\"%s\")", ti.Type, ti.URL)
+	case TrajectoryItemTaskComplete:
+		text = fmt.Sprintf("%s(reason=\"%s\")", ti.Type, ti.Reason)
+	case TrajectoryItemTaskNotPossible:
+		text = fmt.Sprintf("%s(reason=\"%s\")", ti.Type, ti.Reason)
+	case TrajectoryItemObservation:
+		text = fmt.Sprintf("observation: %s", ti.Text)
+	case TrajectoryItemMaxNumStepsReached:
+		text = fmt.Sprintf("error: max num steps reached: %d", ti.MaxNumSteps)
+	case TrajectoryItemMaxContextLengthExceeded:
+		text = fmt.Sprintf("error: max context length exceeded: %d > %d tokens", ti.ContextLengthReceived, ti.ContextLengthAllowed)
+	case TrajectoryItemMessage:
+		text = fmt.Sprintf("%s: %s", ti.Author, ti.Text)
 	default:
-		panic(fmt.Sprintf("unsupported browser action type: %s", ba.Type))
+		panic(fmt.Sprintf("unsupported browser action type: %s", ti.Type))
 	}
 	return fmt.Sprintf("action: %s", text)
 }
 
-func (ba *BrowserAction) GetAbbreviatedText() string {
-	// there may be room to truncate some action types
-	return ba.GetText()
-}
+const DefaultAgentMessageAbbreviationLength = 100
 
-func (ba *BrowserAction) ShouldHandoff() bool {
-	return ba.Type == BrowserActionTypeTaskComplete || ba.Type == BrowserActionTypeTaskNotPossible
-}
-
-func (ba *BrowserAction) ShouldRender() bool {
-	return ba.Render
-}
-
-type BrowserObservation struct {
-	DontHandoff
-	Render
-	ItemIsNotMessage
-	Text            string
-	TextAbbreviated string
-}
-
-func NewBrowserObservation(text string) TrajectoryItem {
-	return &BrowserObservation{
-		Text: text,
+func (ti *TrajectoryItem) GetAbbreviatedText() string {
+	var text string
+	switch ti.Type {
+	case TrajectoryItemClick, TrajectoryItemSendKeys, TrajectoryItemNavigate, TrajectoryItemTaskComplete, TrajectoryItemTaskNotPossible, TrajectoryItemMaxNumStepsReached, TrajectoryItemMaxContextLengthExceeded:
+		text = ti.GetText()
+	case TrajectoryItemObservation:
+		text = ti.GetText()
+		if len(text) > 100 {
+			text = text[:100] + "..."
+		}
+		text = fmt.Sprintf("observation: %s", text)
+	case TrajectoryItemMessage:
+		text = ti.GetText()
+		if ti.Author == MessageAuthorAgent && len(ti.Text) > DefaultAgentMessageAbbreviationLength {
+			text = fmt.Sprintf("%s...", text[:DefaultAgentMessageAbbreviationLength])
+		}
 	}
+	return text
 }
 
-func (bo *BrowserObservation) GetText() string {
-	return fmt.Sprintf("observation: %s", bo.Text)
-}
-
-func (bo *BrowserObservation) GetAbbreviatedText() string {
-	text := bo.Text
-	if len(text) > 100 {
-		text = text[:100] + "..."
+func NewBrowserObservation(text string) *TrajectoryItem {
+	return &TrajectoryItem{
+		Type:          TrajectoryItemObservation,
+		Text:          text,
+		ShouldHandoff: false,
+		ShouldRender:  true,
 	}
-	return fmt.Sprintf("observation: %s", text)
 }

@@ -1,6 +1,7 @@
 package sharedlocalstorage
 
 import (
+	"collaborativebrowser/trajectory"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,7 +15,7 @@ type SharedLocalStorage struct {
 	ctx    context.Context
 	Port   int
 	mu     *sync.Mutex
-	data   map[string]string
+	data   map[string]any
 	server *http.Server
 }
 
@@ -35,34 +36,106 @@ func NewSharedLocalStorage(ctx context.Context, options *Options) *SharedLocalSt
 		ctx:  ctx,
 		Port: port,
 		mu:   &sync.Mutex{},
-		data: make(map[string]string),
+		data: make(map[string]any),
 	}
 }
 
-func (sls *SharedLocalStorage) Start() error {
-	server := &http.Server{Addr: fmt.Sprintf(":%d", sls.Port)}
-	http.HandleFunc("/api-sls", func(w http.ResponseWriter, r *http.Request) {
+type BrowserActionType string
+
+const (
+	BrowserActionTypeClick    BrowserActionType = "click"
+	BrowserActionTypeSendKeys BrowserActionType = "send_keys"
+)
+
+type TrajectoryItemPut struct {
+	ItemType BrowserActionType `json:"item_type"`
+	ID       string            `json:"id"`
+
+	// for send_keys
+	Text string `json:"text"`
+}
+
+func handleTraj(sls *SharedLocalStorage) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("TRAJ: %s %s", r.Method, r.URL.Path)
+		if r.Method != "PUT" {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var data *TrajectoryItemPut
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var item *trajectory.TrajectoryItem
+		switch data.ItemType {
+		case BrowserActionTypeClick:
+			if data.ID == "" {
+				http.Error(w, "id is required for the click action", http.StatusBadRequest)
+				return
+			}
+			item = trajectory.NewBrowserClickAction(data.ID)
+		case BrowserActionTypeSendKeys:
+			if data.ID == "" {
+				http.Error(w, "id is required for the send_keys action", http.StatusBadRequest)
+				return
+			} else if data.Text == "" {
+				http.Error(w, "text is required for the send_keys action", http.StatusBadRequest)
+				return
+			}
+			item = trajectory.NewBrowserSendKeysAction(data.ID, data.Text)
+		default:
+			http.Error(w, fmt.Sprintf("unknown item type %s", data.ItemType), http.StatusBadRequest)
+			return
+		}
+		if err := sls.AddItemToTrajectory(item); err != nil {
+			http.Error(w, fmt.Sprintf("error adding item to trajectory: %s", err.Error()), http.StatusInternalServerError)
+		}
+	})
+}
+
+func (sls *SharedLocalStorage) ReadTrajectory() (*trajectory.Trajectory, error) {
+	if items, err := sls.Get("traj"); err != nil || items == nil {
+		return &trajectory.Trajectory{
+			Items: []*trajectory.TrajectoryItem{},
+		}, nil
+	} else if traj, ok := items.(*trajectory.Trajectory); !ok {
+		return nil, fmt.Errorf("traj is not a trajectory.Trajectory")
+	} else {
+		return traj, nil
+	}
+}
+
+func (sls *SharedLocalStorage) AddItemToTrajectory(item *trajectory.TrajectoryItem) error {
+	return sls.AddItemsToTrajectory([]*trajectory.TrajectoryItem{item})
+}
+
+func (sls *SharedLocalStorage) AddItemsToTrajectory(items []*trajectory.TrajectoryItem) error {
+	if traj, err := sls.ReadTrajectory(); err != nil {
+		return err
+	} else {
+		traj.Items = append(traj.Items, items...)
+		sls.Set("traj", traj)
+	}
+	return nil
+}
+
+func handleSLS(sls *SharedLocalStorage) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("SLS: %s %s", r.Method, r.URL.Path)
 		if r.Method != "GET" && r.Method != "POST" {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		} else if r.Method == "GET" {
-			key := r.URL.Query().Get("key")
-			if key == "" {
-				http.Error(w, "key not specified", http.StatusBadRequest)
+			data := sls.data
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			err := json.NewEncoder(w).Encode(data)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
-			if value, err := sls.Get(key); err != nil {
-				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte(fmt.Sprintf("key not found: %s", key)))
-			} else {
-				data := fmt.Sprintf(`{
-	"data": {
-		"key": "%s",
-		"value": "%s"
-	}
-}`, key, value)
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(data))
-			}
+			return
 		} else if r.Method == "POST" {
 			var data struct {
 				Key   string `json:"key"`
@@ -71,12 +144,19 @@ func (sls *SharedLocalStorage) Start() error {
 			err := json.NewDecoder(r.Body).Decode(&data)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
-			} else {
-				sls.Set(data.Key, data.Value)
-				w.WriteHeader(http.StatusOK)
+				return
 			}
+			sls.Set(data.Key, data.Value)
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 	})
+}
+
+func (sls *SharedLocalStorage) Start() error {
+	server := &http.Server{Addr: fmt.Sprintf(":%d", sls.Port)}
+	http.Handle("/api-sls/traj", handleTraj(sls))
+	http.Handle("/api-sls", handleSLS(sls))
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -99,7 +179,7 @@ func (sls *SharedLocalStorage) Stop() error {
 	return nil
 }
 
-func (sls *SharedLocalStorage) Get(key string) (string, error) {
+func (sls *SharedLocalStorage) Get(key string) (any, error) {
 	sls.mu.Lock()
 	defer sls.mu.Unlock()
 	if value, ok := sls.data[key]; ok {
@@ -108,7 +188,7 @@ func (sls *SharedLocalStorage) Get(key string) (string, error) {
 	return "", fmt.Errorf("key not found")
 }
 
-func (sls *SharedLocalStorage) Set(key string, value string) {
+func (sls *SharedLocalStorage) Set(key string, value any) {
 	sls.mu.Lock()
 	defer sls.mu.Unlock()
 	sls.data[key] = value
@@ -117,5 +197,5 @@ func (sls *SharedLocalStorage) Set(key string, value string) {
 func (sls *SharedLocalStorage) Clear() {
 	sls.mu.Lock()
 	defer sls.mu.Unlock()
-	sls.data = make(map[string]string)
+	sls.data = make(map[string]any)
 }

@@ -40,7 +40,7 @@ func New(models *llm.Models, options *actorstrategy.Options) actorstrategy.Actor
 //   - 2. Sample a reward (s, a) -> r \in {0, 1} from the verification model
 //   - 3. If r is 0, sample from the action space without a_0
 //   - 4. Continue until the verification model returns 1
-func (va *VerificationActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error) {
+func (va *VerificationActor) NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (*trajectory.TrajectoryItem, error) {
 	// TODO: implement
 	return va.baseActorStrategy.NextAction(ctx, traj, br)
 }

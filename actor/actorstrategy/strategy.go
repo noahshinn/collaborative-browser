@@ -8,7 +8,7 @@ import (
 )
 
 type ActorStrategy interface {
-	NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (trajectory.TrajectoryItem, error)
+	NextAction(ctx context.Context, traj *trajectory.Trajectory, br *browser.Browser) (*trajectory.TrajectoryItem, error)
 }
 
 type Options struct {

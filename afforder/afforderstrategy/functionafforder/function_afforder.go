@@ -4,7 +4,6 @@ import (
 	"collaborativebrowser/afforder/afforderstrategy"
 	"collaborativebrowser/browser"
 	"collaborativebrowser/browser/language"
-	"collaborativebrowser/browser/virtualid"
 	"collaborativebrowser/llm"
 	"collaborativebrowser/trajectory"
 	"context"
@@ -139,7 +138,7 @@ func (a *FunctionAfforder) GetFunctionAffordances() []*llm.FunctionDef {
 	return a.permissibleFunctions
 }
 
-func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (trajectory.TrajectoryItem, error) {
+func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (*trajectory.TrajectoryItem, error) {
 	var args map[string]any
 	functions := a.permissibleFunctionMap
 	if err := json.Unmarshal([]byte(arguments), &args); err != nil {
@@ -163,9 +162,9 @@ func (a *FunctionAfforder) ParseNextAction(name string, arguments string) (traje
 	}
 	switch name {
 	case "click":
-		return trajectory.NewBrowserClickAction(virtualid.VirtualID(args["id"].(string))), nil
+		return trajectory.NewBrowserClickAction(args["id"].(string)), nil
 	case "send_keys":
-		return trajectory.NewBrowserSendKeysAction(virtualid.VirtualID(args["id"].(string)), args["text"].(string)), nil
+		return trajectory.NewBrowserSendKeysAction(args["id"].(string), args["text"].(string)), nil
 	case "navigate":
 		return trajectory.NewBrowserNavigateAction(args["url"].(string)), nil
 	case "message":

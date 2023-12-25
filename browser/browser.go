@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -23,19 +24,13 @@ type Browser struct {
 	mu                *sync.Mutex
 	ctx               context.Context
 	cancel            context.CancelFunc
-	options           []BrowserOption
+	options           *Options
 	vIDGenerator      virtualid.VirtualIDGenerator
 	translators       map[language.Language]translators.Translator
 	display           *BrowserDisplay
 	isRunningHeadless bool
+	localServerPort   int
 }
-
-type BrowserOption string
-
-const (
-	BrowserOptionHeadful                           BrowserOption = "headful"
-	BrowserOptionAttemptToDisableAutomationMessage BrowserOption = "attempt-to-disable-automation-message"
-)
 
 type BrowserDisplay struct {
 	HTML     string
@@ -70,20 +65,16 @@ func (b *Browser) updateDisplay() error {
 	}
 }
 
-func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error) {
+func (b *Browser) AcceptAction(action *trajectory.TrajectoryItem) (string, error) {
 	var err error
 	var response string
 	switch action.Type {
-	case trajectory.BrowserActionTypeClick:
+	case trajectory.TrajectoryItemClick:
 		if err = b.Click(action.ID); err != nil {
 			return "", fmt.Errorf("error clicking: %w", err)
 		}
 		response = fmt.Sprintf("clicked %s", action.ID)
-		// REMOVE
-		if err := b.run(primitives.LocalStorageWrite("last-clicked", fmt.Sprintf(`{"id": "%s"}`, action.ID))); err != nil {
-			return "", fmt.Errorf("error writing to local storage: %w", err)
-		}
-	case trajectory.BrowserActionTypeSendKeys:
+	case trajectory.TrajectoryItemSendKeys:
 		if err = b.SendKeys(action.ID, action.Text); err != nil {
 			return "", fmt.Errorf("error sending keys: %w", err)
 		}
@@ -92,7 +83,7 @@ func (b *Browser) AcceptAction(action *trajectory.BrowserAction) (string, error)
 			keysDisplay = keysDisplay[:10] + "..."
 		}
 		response = fmt.Sprintf("sent keys \"%s\" to %s", keysDisplay, action.ID)
-	case trajectory.BrowserActionTypeNavigate:
+	case trajectory.TrajectoryItemNavigate:
 		if err = b.Navigate(action.URL); err != nil {
 			return "", fmt.Errorf("error navigating: %w", err)
 		}
@@ -112,7 +103,7 @@ func (b *Browser) run(actions ...chromedp.Action) error {
 	return chromedp.Run(b.ctx, actions...)
 }
 
-func (b *Browser) Click(id virtualid.VirtualID) error {
+func (b *Browser) Click(id string) error {
 	previousLocation := b.display.Location
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
@@ -145,7 +136,7 @@ func (b *Browser) Click(id virtualid.VirtualID) error {
 	return nil
 }
 
-func (b *Browser) SendKeys(id virtualid.VirtualID, keys string) error {
+func (b *Browser) SendKeys(id string, keys string) error {
 	if !b.vIDGenerator.IsValidVirtualID(id) {
 		return fmt.Errorf("invalid virtual id: %s", id)
 	} else if keys == "" {
@@ -287,8 +278,9 @@ func (b *Browser) RunHeadful(ctx context.Context) error {
 		return nil
 	}
 	log.Println("running the browser in headful mode; warning: you will lose all non-location state from the current browser")
-	newOps := append(b.options, BrowserOptionHeadful)
-	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	newOptions := b.options
+	newOptions.RunHeadful = true
+	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOptions)
 	b.cancel()
 	b.ctx = newBrowserCtx
 	b.cancel = newBrowserCancelFunc
@@ -399,10 +391,9 @@ func (b *Browser) RunHeadless(ctx context.Context) error {
 		return nil
 	}
 	log.Println("running the browser in headless mode; warning: you will lose all non-location state from the current browser")
-	newOps := slicesx.Filter(b.options, func(option BrowserOption, _ int) bool {
-		return option != BrowserOptionHeadful
-	})
-	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOps...)
+	newOptions := b.options
+	newOptions.RunHeadful = false
+	newBrowserCtx, newBrowserCancelFunc := newBrowser(ctx, newOptions)
 	b.cancel()
 	b.ctx = newBrowserCtx
 	b.cancel = newBrowserCancelFunc
@@ -413,36 +404,61 @@ func (b *Browser) RunHeadless(ctx context.Context) error {
 	return nil
 }
 
-func buildOptions(options ...BrowserOption) []func(*chromedp.ExecAllocator) {
+func buildChromedpOptions(options *Options) []func(*chromedp.ExecAllocator) {
 	ops := chromedp.DefaultExecAllocatorOptions[:]
-	for _, option := range options {
-		switch option {
-		case BrowserOptionHeadful:
+	if options != nil {
+		if options.RunHeadful {
 			ops = append(ops, chromedp.Flag("headless", false))
-		case BrowserOptionAttemptToDisableAutomationMessage:
+		}
+		if options.AttemptToDisableAutomationMessage {
 			ops = append(ops, chromedp.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"))
 			ops = append(ops, chromedp.Flag("enable-automation", false))
-		default:
 		}
 	}
 	return ops
 }
 
-func newBrowser(ctx context.Context, options ...BrowserOption) (browserCtx context.Context, cancelFunc context.CancelFunc) {
-	ops := buildOptions(options...)
+func newBrowser(ctx context.Context, options *Options) (browserCtx context.Context, cancelFunc context.CancelFunc) {
+	ops := buildChromedpOptions(options)
 	parentCtx, _ := chromedp.NewExecAllocator(ctx, ops...)
 	browserCtx, cancel := chromedp.NewContext(parentCtx)
 	return browserCtx, cancel
 }
 
-func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
-	isRunningHeadless := !slicesx.Contains(options, BrowserOptionHeadful)
+type Options struct {
+	LocalStorageServerPort            int
+	RunHeadful                        bool
+	AttemptToDisableAutomationMessage bool
+}
+
+// TODO: initialization when toggling headful/headless mode
+
+func (b *Browser) Initialize() error {
+	if err := b.run(primitives.InitializeGlobalStore()); err != nil {
+		return fmt.Errorf("error initializing global store: %w", err)
+	} else if err := b.run(primitives.WriteGlobalVar("localStorageServerPort", strconv.Itoa(b.localServerPort))); err != nil {
+		return fmt.Errorf("error writing local storage server port: %w", err)
+	}
+	return nil
+}
+
+func NewBrowser(ctx context.Context, options *Options) *Browser {
 	vIDGenerator := virtualid.NewIncrIntVirtualIDGenerator()
 	htmlToMDTranslator := html2md.NewHTML2MDTranslator(nil)
 	translatorMap := map[language.Language]translators.Translator{
 		language.LanguageMD: htmlToMDTranslator,
 	}
-	browserCtx, cancel := newBrowser(ctx, options...)
+	isRunningHeadless := true
+	localServerPort := 2334
+	if options != nil {
+		if options.LocalStorageServerPort > 0 {
+			localServerPort = options.LocalStorageServerPort
+		}
+		if options.RunHeadful {
+			isRunningHeadless = false
+		}
+	}
+	browserCtx, cancel := newBrowser(ctx, options)
 	b := Browser{
 		mu:                &sync.Mutex{},
 		ctx:               browserCtx,
@@ -452,6 +468,11 @@ func NewBrowser(ctx context.Context, options ...BrowserOption) *Browser {
 		translators:       translatorMap,
 		display:           &BrowserDisplay{},
 		isRunningHeadless: isRunningHeadless,
+		localServerPort:   localServerPort,
+	}
+	if err := b.Initialize(); err != nil {
+		log.Println("error initializing browser:", err)
+		panic(err)
 	}
 	return &b
 }
