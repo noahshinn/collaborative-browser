@@ -438,6 +438,8 @@ func (b *Browser) Initialize() error {
 		return fmt.Errorf("error initializing global store: %w", err)
 	} else if err := b.run(primitives.WriteGlobalVar("localStorageServerPort", strconv.Itoa(b.localServerPort))); err != nil {
 		return fmt.Errorf("error writing local storage server port: %w", err)
+	} else if err := b.run(primitives.AddClickEventHandler()); err != nil {
+		return fmt.Errorf("error adding click event handler: %w", err)
 	}
 	return nil
 }

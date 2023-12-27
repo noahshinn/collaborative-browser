@@ -91,10 +91,29 @@ localStorageWrite('%s', '%s')
 
 func AddClickEventHandler() chromedp.Action {
 	return AddEventHandler("click", `async (event) => {
-	const response = fetch("http://localhost:2334/api-sls/traj", {
+	const port = globalThis.collaborativeBrowserStore?.port;
+	if (port === undefined) {
+		throw new Error("port is undefined; must initialize it first");
+	}
+	const host = "localhost";
+	const endpoint = "/api-sls/traj";
+	const id = event.target.getAttribute("data-vid");
+	if (id === null) {
+		throw new Error("data-vid attribute not found");
+	}
+	const response = await fetch("http://" + host + ":" + port + endpoint, {
 		method: "POST",
 		body: JSON.stringify({
-			key: "click",
+			action: "click",
+			args: {
+				id,
+			}
+		}),
+	});
+	
+	if (!response.ok) {
+		throw new Error("HTTP error " + response.status);
+	}
 }`)
 }
 
@@ -131,11 +150,10 @@ readGlobalVar('%s');`, key)
 
 func WriteGlobalVar(key string, value string) chromedp.Action {
 	js := fmt.Sprintf(`function addGlobalVar(key, value) {
-	const collaborativeBrowserStore = globalThis.collaborativeBrowserStore;
-	if (collaborativeBrowserStore === undefined) {
+	if (globalThis.collaborativeBrowserStore === undefined) {
 		throw new Error("collaborativeBrowserStore is undefined; must initialize it first");
 	}
-	collaborativeBrowserStore[key] = value;
+	globalThis.collaborativeBrowserStore[key] = value;
 }
 addGlobalVar('%s', '%s');`, key, value)
 	return chromedp.Evaluate(js, nil)
