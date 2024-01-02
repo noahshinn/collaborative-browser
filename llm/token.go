@@ -42,7 +42,7 @@ func ApproxNumTokensInFunctionDefs(functionDefs []*FunctionDef) int {
 	for _, functionDef := range functionDefs {
 		b, err := json.Marshal(functionDef)
 		if err != nil {
-			b = []byte(fmt.Sprintf("%s", functionDef))
+			b = []byte(fmt.Sprintf("%v", functionDef))
 		}
 		numTokens += ApproxNumTokens(string(b))
 	}
